@@ -197,12 +197,12 @@ class Distribution:
         """
         return random.choices(self.__items, [item[1] for item in self.__items])[0]
 
-    def set(self, element):
+    def set(self, element, normalize=True):
         """
         Reduce distribution to be 100% for the given element
         :param element: the element that will be the only one with nonzero probability
         """
-        self.__items = [(element, 1)]
+        self.__items = [(element, 1 if normalize else self[element])]
 
     def select(self, maximize=False):
         """
