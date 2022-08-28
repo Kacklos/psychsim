@@ -508,6 +508,28 @@ class KeyedTree:
             # Leaf node (not a very smart use of graft, but who are we to judge)
             self.makeLeaf(root)
 
+    def select(self, leaf_test):
+        """
+        Modify this tree so that it has only the given leaf, and return the probability of such a selection
+        """
+        if self.isLeaf():
+            if leaf_test(self.getLeaf()):
+                return 1
+            else:
+                raise ValueError(f'Tree is already a leaf {self.getLeaf()}, but conflicts with selection')
+        elif self.isProbabilistic():
+            for child, prob in self.children._Distribution__items:
+                try:
+                    child.select(leaf_test)
+                    self.children.set(child)
+                    return prob
+                except ValueError:
+                    pass
+            else:
+                raise ValueError(f'No match for leaf in {self}')
+        else:
+            raise TypeError(f'Unable to select over deterministic branchpoints')
+
     def sampleLeaf(self, vector, mostlikely=False):
         """
         :param mostlikely: if True, then only the most likely branches are chosen at each probabilistic branch
