@@ -410,94 +410,9 @@ class Agent(object):
                                       context=f'{context} V_{model}^{t}({node["__A__"]})')
         discount = self.getAttribute('discount', model)
         node['__ER__'].append(self.reward(current, model))
-        node['__EV__'] += node['__ER__'][-1] * discount ** node['__t__']
+        node['__EV__'] += probability * node['__ER__'][-1] * discount ** node['__t__']
         node['__t__'] += 1
         return node
-
-    def oldvalue(self,vector,action=None,horizon=None,others=None,model=None,keys=None):
-        """
-        Computes the expected value of a state vector (and optional action choice) to this agent
-
-        :param vector: the state vector (not distribution) representing the possible world under consideration
-        :type vector: L{KeyedVector}
-        :param action: prescribed action choice for the agent to evaluate; if ``None``, then use agent's own action choice (default is ``None``)
-        :type action: L{ActionSet}
-        :param horizon: the number of time steps to project into the future (default is agent's horizon)
-        :type horizon: int
-        :param others: optional table of actions being performed by other agents in this time step (default is no other actions)
-        :type others: strS{->}L{ActionSet}
-        :param model: the model of this agent to use (default is ``True``)
-        :param keys: subset of state features to project over in computing future value (default is all state features)
-        """
-        if model is None:
-            model = self.world.getModel(self.name,vector)
-        # Determine horizon
-        if horizon is None:
-            horizon = self.getAttribute('horizon',model)
-        # Determine discount factor
-        discount = self.getAttribute('discount',model)
-        # Compute immediate reward
-        R = self.reward(vector,model)
-        result = {'R': R,
-                  'agent': self.name,
-                  'state': vector,
-                  'horizon': horizon,
-                  'projection': []}
-        # Check for pre-computed value function
-        V = self.getAttribute('V',model).get(self.name,vector,action,horizon,
-                                             self.getAttribute('ignore',model))
-        if V is not None:
-            result['V'] = V
-        else:
-            result['V'] = R
-            if horizon > 0 and not self.world.terminated(vector):
-                # Perform action(s)
-                if others is None:
-                    turn = {}
-                else:
-                    turn = copy.copy(others)
-                if not action is None:
-                    turn[self.name] = action
-                outcome = self.world.stepFromState(vector,turn,horizon,keySubset=keys)
-                if not 'new' in outcome:
-                    # No consistent outcome
-                    pass
-                elif isinstance(outcome['new'],Distribution):
-                    # Uncertain outcomes
-                    future = Distribution()
-                    for newVector in outcome['new'].domain():
-                        entry = copy.copy(outcome)
-                        entry['probability'] = outcome['new'][newVector]
-                        Vrest = self.value(newVector,None,horizon-1,None,model,keys)
-                        entry.update(Vrest)
-                        try:
-                            future[entry['V']] += entry['probability']
-                        except KeyError:
-                            future[entry['V']] = entry['probability']
-                        result['projection'].append(entry)
-                    # The following is typically "expectation", but might be "max" or "min", too
-                    op = self.getAttribute('projector',model)
-                    if discount < -self.epsilon:
-                        # Only final value matters
-                        result['V'] = apply(op,(future,))
-                    else:
-                        # Accumulate value
-                        result['V'] += discount*apply(op,(future,))
-                else:
-                    # Deterministic outcome
-                    outcome['probability'] = 1.
-                    Vrest = self.value(outcome['new'],None,horizon-1,None,model,keys)
-                    outcome.update(Vrest)
-                    if discount < -self.epsilon:
-                        # Only final value matters
-                        result['V'] = Vrest['V']
-                    else:
-                        # Accumulate value
-                        result['V'] += discount*Vrest['V']
-                    result['projection'].append(outcome)
-            # Do some caching
-            self.getAttribute('V',model).set(self.name,vector,action,horizon,result['V'])
-        return result
 
     def valueIteration(self,horizon=None,ignore=None,model=True,epsilon=1e-6,debug=0,maxIterations=None):
         """
