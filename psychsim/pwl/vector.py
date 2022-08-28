@@ -32,17 +32,16 @@ class KeyedVector(collections.abc.MutableMapping):
         return key in self._data
     
     def __eq__(self, other):
-        delta = 0.
+        delta = 0
         tested = {}
-        for key, value in self.items():
+        for key in self.keys() | other.keys():
+            my_value = self.get(key, 0)
+            yr_value = other.get(key, 0)
             try:
-                delta += abs(value-other[key])
-            except KeyError:
-                delta += abs(value)
-            tested[key] = True
-        for key,value in other.items():
-            if key not in tested:
-                delta += abs(value)
+                delta += abs(my_value-yr_value)
+            except TypeError:
+                if my_value != yr_value:
+                    return False
         return delta < self.epsilon
 
     def __ne__(self,other):
