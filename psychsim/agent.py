@@ -415,6 +415,8 @@ class Agent(object):
                                       debug=debug,
                                       context=f'{context} V_{model}^{t}({node["__A__"]})')
         discount = self.getAttribute('discount', model)
+        if discount is None:
+            discount = 1
         node['__ER__'].append(self.reward(current, model))
         node['__EV__'] += node['__ER__'][-1] * discount ** node['__t__']
         node['__t__'] += 1
