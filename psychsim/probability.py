@@ -90,13 +90,16 @@ class Distribution:
         :param element: the domain element
         :param probability: the probability to add for this element
         :type probability: float
+        :return: the resulting probability of the element
         """
         for index, content in enumerate(self.__items):
             if content[0] == element:
-                self.__items[index] = (element, content[1]+probability)
-                break
+                new_prob = content[1]+probability
+                self.__items[index] = (element, new_prob)
+                return new_prob
         else:
             self.__items.append((element, probability))
+            return probability
 
     def addProb(self, element, value):
         """
@@ -191,11 +194,16 @@ class Distribution:
     def __float__(self):
         return self.expectation()
 
-    def sample(self) -> Tuple[Any, float]:
+    def sample(self, maximize=False) -> Tuple[Any, float]:
         """
         :returns: an element from this domain, with a sample probability given by this distribution
         """
-        return random.choices(self.__items, [item[1] for item in self.__items])[0]
+        if maximize:
+            element = self.max()
+            prob = self[element]
+            return element, prob
+        else:
+            return random.choices(self.__items, [item[1] for item in self.__items])[0]
 
     def set(self, element, normalize=True):
         """
