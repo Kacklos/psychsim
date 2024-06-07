@@ -159,8 +159,9 @@ class World(object):
         prob = 1
         actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
-        policies, choices, action_prob = self.delta_action(state, actions, horizon, tiebreak, keySubset, debug, context)
+        policies, choices, action_prob = self.delta_action(state, actions, horizon, tiebreak, keySubset, select, debug, context)
         prob *= action_prob
+#        print(prob)
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices, state, keySubset)
         # Update turn order
@@ -170,6 +171,10 @@ class World(object):
             state.make_certain()
         # The future becomes the present
         state.rollback()
+        if isinstance(select, dict):
+            sample = select.get(None, False)
+        else:
+            sample = select
         if updateBeliefs:
             # Update agent models included in the original world
             # (after finding out possible new worlds)
@@ -182,12 +187,12 @@ class World(object):
                 agent = self.agents[name]
                 agent.updateBeliefs(state, policies, horizon=horizon, context=context)
                 substate = state.keyMap[makeFuture(key)]
-                if select and substate is not None:
+                if sample and substate is not None:
                     state.distributions[substate].select(select == 'max')
             # The future becomes the present
             state.rollback()
 
-        if select:
+        if sample:
             prob *= state.select(select == 'max')
         if threshold is not None:
             prob *= state.prune_probability(threshold)
@@ -198,7 +203,7 @@ class World(object):
         return prob
 
     def delta_action(self, state=None, actions=None, horizon=None, tiebreak=None,
-                     keySubset=None, debug={}, context=''):
+                     keySubset=None, select=False, debug={}, context=''):
         if state is None:
             state = self.state
         if keySubset is None:
@@ -219,15 +224,25 @@ class World(object):
                         # Translate any pre-specified actions into PWL policy
                         if isinstance(actions[name], Action):
                             actions[name] = ActionSet([actions[name]])
+                        if isinstance(select, dict) and action in select:
+                            if actions[name] != self.float2value(action, select[action]):
+                                raise ValueError(f'Forced action {actions[name]} conflicts with selected action {self.float2value(action, select[action])}')
                         if isinstance(actions[name], ActionSet):
                             choices[name] = [actions[name]]
                             policies[name] = makeTree(setToConstantMatrix(action,actions[name])).desymbolize(self.symbols)
                         else:
                             policies[name] = actions[name]
                             choices[name] = {self.float2value(action, m[makeFuture(action)][CONSTANT]) for m in policies[name].leaves()}
-                    else:
+                    elif modelKey(name) in keySubset:
                         decision = self.agents[name].decide(state=state, horizon=horizon, others=actions, debug=debug.get(name, {}), context=context)
-                        probability *= decision.get('probability', 1)
+                        if isinstance(select, dict) and action in select:
+                            action_selection = self.float2value(action, select[action])
+                            action_prob = decision['policy'].select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
+                        elif select:
+                            action_prob = decision['policy'].select()
+                        else:
+                            action_prob = decision.get('probability', 1)
+                        probability *= action_prob
                         if name in debug:
                             debug[name]['__decision__'] = decision
                         try:
@@ -283,23 +298,44 @@ class World(object):
     def applyEffect(self, state, effect, select=False, max_k: Optional[int] = None) -> float:
         if isinstance(select, dict):
             default_select = select.get('__default__', True)
+            sample = select.get(None, False)
         else:
             default_select = select
+            sample = select
         prob = 1
         if isinstance(effect, list):
             for stage in effect:
                 prob *= self.applyEffect(state, stage, select)
         else:
             for key, dynamics in effect.items():
-                if dynamics is None:
-                    pass
-                elif len(dynamics) == 1:
-                    tree = dynamics[0]
+                if dynamics is not None:
+                    if len(dynamics) > 1:
+                        # Simultaneous effects on this variable
+                        cumulative = None
+                        for tree in dynamics:
+                            if cumulative is None:
+                                cumulative = copy.deepcopy(tree)
+                            else:
+                                cumulative.makeFuture([key])
+                                cumulative *= tree
+                        tree = cumulative
+                    else:
+                        tree = dynamics[0]
                     for in_key in tree.getKeysIn():
                         if isFuture(in_key) and in_key not in state:
                             state.copy_value(makePresent(in_key), in_key)
                     try:
-                        state *= tree
+                        if sample:
+                            if isinstance(state, VectorDistributionSet):
+                                state.multiply_tree(tree, select=sample)
+#                                state.__imul__(tree, select)
+                            else:
+                                if isinstance(tree, KeyedMatrix):
+                                    state *= tree
+                                else:
+                                    raise TypeError(f'Unable to generate selective effect from:\n{tree}')
+                        else:
+                            state *= tree
                     except StopIteration:
                         self.printState(state)
                         print(tree)
@@ -312,25 +348,6 @@ class World(object):
                         print('Applying effect on %s' % (key))
                         print('Effect tree is\n%s' % (tree))
                         raise
-                else:
-                    cumulative = None
-                    for tree in dynamics:
-                        if cumulative is None:
-                            cumulative = copy.deepcopy(tree)
-                        else:
-                            cumulative.makeFuture([key])
-                            cumulative *= tree
-                    tree = cumulative
-                    if select:
-                        if isinstance(state, VectorDistributionSet):
-                            state.__imul__(tree, select)
-                        else:
-                            if isinstance(tree, KeyedMatrix):
-                                state *= tree
-                            else:
-                                raise TypeError(f'Unable to generate selective effect from:\n{tree}')
-                    else:
-                        state *= tree
                 if isinstance(select, dict) and key in select:
                     try:
                         target = makeFuture(key)
@@ -340,11 +357,21 @@ class World(object):
                         target = key
                         values = state.marginal(target)
                     if select[key] not in values:
-                        value = self.float2value(key, select[key])
-                        nonzero = ', '.join(['"%s"' % (self.float2value(key, el)) 
-                                             for el in values.domain()])
-                        raise ValueError(f'Selecting impossible value "{value}" for {key} (nonzero probability for {nonzero})')
+                        prob = 0
+                        break
+#                    print(key, target, sample)
+#                    if dynamics is not None:
+#                        print(tree)
+#                    print(state.marginal(key))
+#                    print(state.marginal(target))
+#                        value = self.float2value(key, select[key])
+#                        nonzero = ', '.join(['"%s"' % (self.float2value(key, el)) 
+#                                             for el in values.domain()])
+#                        raise ValueError(f'Selecting impossible value "{value}" for {key} (nonzero probability for {nonzero})')
                     prob *= state.setitem(target, select[key])
+                    if prob < 0:
+                        print(key, select[key], target)
+                        raise RuntimeError
                 if max_k is not None:
                     prob *= state.prune_size(max_k)
         return prob
