@@ -664,7 +664,7 @@ class VectorDistributionSet:
             self *= other.children[None]
         elif other.isProbabilistic():
             if select:
-                oldKid, prob = other.children.sample(quantify=True, most_likely=select=='max')
+                oldKid, prob = other.children.sample(maximize=select=='max')
                 self.multiply_tree(oldKid, probability=prob, select=select)
             else:
                 oldKids = list(other.children.domain())
@@ -791,14 +791,19 @@ class VectorDistributionSet:
                         logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
                     else:
                         logging.error('Missing branch for value %s in tree:\n%s' % (test, str(other)))
-            self.multiply_tree(other.children[first], probability*states[first][1])
+            self.multiply_tree(other.children[first], probability*states[first][1], select)
             del states[first]
             new_keys = set(other.getKeysOut())
             for test, s_plus in states.items():
                 s = s_plus[0]
                 branch_keys = set(s.distributions[s_plus[2]].keys()) - {keys.CONSTANT}
-                s.multiply_tree(other.children[test], states[test][1])
-                self.update(s, new_keys|branch_keys)
+                s.multiply_tree(other.children[test], states[test][1], select)
+                self.update(s, new_keys | branch_keys)
+            for k in new_keys:
+                for el, p in self.marginal(k).items():
+                    if abs(p) > 1:
+                        print(k)
+                        raise RuntimeError
 
     def __rmul__(self,other):
         if isinstance(other,KeyedVector) or isinstance(other,KeyedTree):
