@@ -679,7 +679,7 @@ class VectorDistributionSet:
                 self.multiply_tree(oldKids[0], probability=other.children[oldKids[0]], select=select)
                 subkeys = oldKids[0].getKeysOut()
                 # Compute first-born child
-                newKids.insert(0,self)
+                newKids.insert(0, self)
                 for index in range(len(oldKids)):
                     prob = other.children[oldKids[index]]
                     substates = newKids[index].substate(subkeys)
@@ -694,15 +694,15 @@ class VectorDistributionSet:
                     else:
                         toCollapse = (subkeys,set())
                         while len(toCollapse[0]) + len(toCollapse[1]) > 0:
-                            mySubstates = self.substate(toCollapse[1]|\
+                            mySubstates = self.substate(toCollapse[1] | \
                                                         set(self.distributions[mySubstate].keys()))
                             if len(mySubstates) > 1:
                                 mySubstate = self.collapse(mySubstates,False)
                             else:
                                 mySubstate = next(iter(mySubstates))
-                            substates = newKids[index].substate(toCollapse[0]|set(newKids[index].distributions[substate].keys()))
+                            substates = newKids[index].substate(toCollapse[0] | set(newKids[index].distributions[substate].keys()))
                             if len(substates) > 1:
-                                substate = newKids[index].collapse(substates,False)
+                                substate = newKids[index].collapse(substates, False)
                             else:
                                 substate = next(iter(substates))
                             toCollapse = ({k for k in self.distributions[mySubstate].keys() \
@@ -713,12 +713,12 @@ class VectorDistributionSet:
                                            not k in self.distributions[mySubstate].keys()})
                         distribution = newKids[index].distributions[substate]
                         for vector in distribution.domain():
-                            self.distributions[mySubstate].addProb(vector,distribution[vector]*prob)
+                            self.distributions[mySubstate].add_prob(vector, distribution[vector]*prob)
         else:
             # Apply the test to this tree
-            sufficient = not other.branch.isConjunction # If any plane test gets this value, no need to test further (e.g., False for conjunctions)
+            sufficient = not other.branch.isConjunction  # If any plane test gets this value, no need to test further (e.g., False for conjunctions)
             first = '__null__'
-            states = {first: (self, probability, None)} # (state, probability, substate)
+            states = {first: (self, probability, None)}  # (state, probability, substate)
             for p_index, plane in enumerate(other.branch.planes):
                 current_states = [(old_value, s_tuple) for old_value, s_tuple in list(states.items()) if old_value != sufficient]
                 if len(current_states) == 0:
@@ -736,7 +736,7 @@ class VectorDistributionSet:
                         if len(partials) > 1:
                             raise ValueError(f'Miraculous but incorrect appearance of multiple subdistributions with probability mass < 1 {[self.distributions[s].probability() for s in partials]}')
                         elif len(partials) == 0:
-                            raise ValueError(f'Where did all the incompleteness go?')
+                            raise ValueError('Where did all the incompleteness go?')
                         if partials[0] != valSub:
                             # The test result covers a different set of variables than was tested upstream
                             valSub = s.merge([partials[0], valSub])
@@ -771,15 +771,15 @@ class VectorDistributionSet:
                             else:
                                 states[test] = (states[test][0], states[test][1]+prob, states[test][2])
                             if len(vector) > 1:
-                                states[test][0].distributions[states[test][2]].addProb(vector, prob)
+                                assert states[test][0].distributions[states[test][2]].addProb(vector, prob) <= 1
                         elif should_copy:
                             states[test] = (copy.deepcopy(s), prob, valSub)
                             states[test][0].distributions[valSub].clear()
-                            states[test][0].distributions[valSub].addProb(vector, prob)
+                            assert states[test][0].distributions[valSub].addProb(vector, prob) <= 1
                         else:
                             states[test] = (s, prob, valSub)
                             should_copy = True
-                            states[test][0].distributions[valSub].addProb(vector, prob)
+                            assert states[test][0].distributions[valSub].addProb(vector, prob) <= 1
                         if states[test][0] is self:
                             first = test
                     if len(s.distributions[valSub]) == 0:
@@ -998,8 +998,8 @@ class VectorDistributionSet:
     def copy_subset(self, ignore=None, include=None):
         result = self.__class__()
         if ignore is None and include is None:
-                # Ignoring nothing, including everything, so this is just a copy
-                return self.__deepcopy__({})
+            # Ignoring nothing, including everything, so this is just a copy
+            return self.__deepcopy__({})
         if include is None:
             include = set(self.keys())
         if ignore is None:
@@ -1027,7 +1027,7 @@ class VectorDistributionSet:
                     result.distributions[substate].remove_duplicates()
         return result
                     
-    def verifyIntegrity(self,sumToOne=False):
+    def verifyIntegrity(self, sumToOne=False):
         for key in self.keys():
             assert self.keyMap[key] in self.distributions,'Distribution %s missing for key %s' % \
                 (self.keyMap[key],key)
@@ -1078,9 +1078,9 @@ class VectorDistributionSet:
         :return: a dictionary of differences between me and the given state
         """
         result = {'only_me': self.keys() - other.keys(),
-            'only_you': other.keys() - self.keys(),
-            'dependency mismatch': {},
-            'probability mismatch': set()}
+                  'only_you': other.keys() - self.keys(),
+                  'dependency mismatch': {},
+                  'probability mismatch': set()}
         for key in self.keys() & other.keys():
             if self.marginal(key) != other.marginal(key):
                 result['probability mismatch'].add(key)
@@ -1091,3 +1091,10 @@ class VectorDistributionSet:
             if mismatch:
                 result['dependency mismatch'][key] = mismatch
         return result
+
+    def max_len(self):
+        """
+        :return: the size of the largest subdistribution
+        """
+        return max([len(dist) for dist in self.distributions.values()])
+        
