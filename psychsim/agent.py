@@ -349,7 +349,7 @@ class Agent(object):
         return result
 
     def value(self, belief, action, model=None, horizon=None, others=None, 
-              keySet=None, updateBeliefs=True, debug={}, context=''):
+              keySet=None, updateBeliefs=True, samples=None, debug={}, context=''):
         if model is None:
             model = self.get_true_model(unique=True)
         if horizon is None:
@@ -358,9 +358,9 @@ class Agent(object):
             keySet = belief.keys()
         # Compute value across possible worlds
         logging.debug(f'{context} V_{model}^{horizon}({action})=?')
-        current = copy.deepcopy(belief)
         V_A = self.getAttribute('V', model)
         if V_A:
+            current = copy.deepcopy(belief)
             current *= V_A[action]
             R = current[makeFuture(rewardKey(self.name))]
             V = {'__beliefs__': current,
@@ -368,11 +368,16 @@ class Agent(object):
                  '__ER__': [R],
                  '__EV__': R.expectation()}
         else:
-            V = {'__EV__': 0, '__ER__': [], '__S__': [current], '__t__': 0, 
-                 '__A__': action}
+            if samples is None:
+                samples = self.getAttribute('samples', model)
+            nodes = [{'__EV__': 0, '__ER__': [], '__S__': [copy.deepcopy(belief)], '__t__': 0, 
+                      '__A__': action} 
+                     for i in range(1 if samples is None else samples)]
             if isinstance(keySet, dict):
+                # Allow for specifying relevant variables on a per-action basis.
                 subkeys = keySet[action]
             else:
+                # Default is all variables in my beliefs are relevant
                 subkeys = belief.keys()
             if others:
                 start = dict(others)
@@ -380,14 +385,35 @@ class Agent(object):
                 start = {}
             if action:
                 start[self.name] = action
-            while V['__t__'] < horizon:
-                V = self.expand_value(V, start, model, subkeys, horizon, 
-                                      updateBeliefs, debug, context)
-            V['__beliefs__'] = V['__S__'][-1]
+            for node in nodes:
+                node['__start__'] = dict(start)
+                if samples is None:
+                    node['__prob__'] = 1
+                else:
+                    node['__prob__'] = node['__S__'][0].select()
+            V = {'__nodes__': []}
+            while nodes:
+                index = 0
+                while index < len(nodes):
+                    if nodes[index]['__t__'] < horizon:
+                        nodes[index] = self.expand_value(nodes[index], nodes[index]['__start__'], model, subkeys, horizon, 
+                                                         updateBeliefs, samples is not None, debug, context)
+                        index += 1
+                    else:
+                        nodes[index]['__beliefs__'] = nodes[index]['__S__'][-1]
+                        V['__nodes__'].append(nodes[index])
+                        del nodes[index]
+            if samples is None:
+                V.update(V['__nodes__'][0])
+            else:
+                # Accumulate sampled outcomes
+                nodes = V['__nodes__']
+                V['__prob__'] = sum([node['__prob__'] for node in nodes])
+                V['__EV__'] = sum([node['__EV__'] for node in nodes])/len(nodes)
         return V
         
     def expand_value(self, node, actions, model=None, subkeys=None, 
-                     horizon=None, update_beliefs=True, debug={}, context=''):
+                     horizon=None, update_beliefs=True, select=False, debug={}, context=''):
         """
         Expands a given value node by a single step, updating the sequence of states and expected rewards accordingly
         """
@@ -406,9 +432,10 @@ class Agent(object):
                 del actions[name]
         probability = self.world.step(forced_actions, current, keySubset=subkeys, 
                                       horizon=horizon-t, updateBeliefs=update_beliefs, 
-                                      debug=debug,
+                                      select=select, debug=debug,
                                       context=f'{context} V_{model}^{t}({node["__A__"]})')
         discount = self.getAttribute('discount', model)
+        node['__prob__'] *= probability
         node['__ER__'].append(self.reward(current, model))
         node['__EV__'] += probability * node['__ER__'][-1] * discount ** node['__t__']
         node['__t__'] += 1
@@ -1124,7 +1151,7 @@ class Agent(object):
         """
         Handles all combinations of state type and specified belief type
         """
-        assert ignore is None or include is None,'Use either ignore or include sets, but not both'
+        assert ignore is None or include is None, 'Use either ignore or include sets, but not both'
         if state is None:
             state = self.world.state
         if model is None:
