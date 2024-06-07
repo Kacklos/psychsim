@@ -88,7 +88,7 @@ if __name__ == '__main__':
         # set agent's params
         agent.setAttribute('discount', 1)
         agent.setAttribute('selection', TIEBREAK)
-        agent.setRecursiveLevel(1)
+#        agent.setRecursiveLevel(1)
 
         # add "decision" variable (0 = didn't decide, 1 = Defected, 2 = Cooperated)
         dec = world.defineState(agent.name, 'decision', int, lo=0, hi=2)
