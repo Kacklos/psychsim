@@ -4,11 +4,11 @@ import math
 from psychsim.probability import Distribution
 from psychsim.action import ActionSet
 from psychsim.world import World
-from psychsim.pwl.keys import makeFuture, stateKey
+from psychsim.pwl.keys import makeFuture, modelKey, stateKey
 from psychsim.pwl.matrix import approachMatrix, incrementMatrix, noChangeMatrix, setTrueMatrix
 from psychsim.pwl.plane import equalRow, thresholdRow, trueRow
 from psychsim.pwl.tree import makeTree
-from psychsim.reward import minimizeFeature, maximizeFeature
+from psychsim.reward import minimizeFeature, maximizeFeature, achieveGoal
 
 
 def setup_world():
@@ -82,15 +82,13 @@ def add_reward(world):
 
 def add_models(world, rationality=1):
     model = world.agents['Tom'].get_true_model()
-    world.agents['Tom'].addModel('friend', rationality=rationality, selection='distribution', horizon=1, parent=model)
-    world.agents['Tom'].setReward(maximizeFeature(stateKey('Jerry', 'health'), 'Tom'), 1, 'friend')
-    world.agents['Tom'].create_belief_state(model='friend')
-    world.agents['Tom'].addModel('foe', rationality=rationality, selection='distribution', horizon=1, parent=model)
-    world.agents['Tom'].setReward(minimizeFeature(stateKey('Jerry', 'health'), 'Tom'), 1, 'foe')
-    world.agents['Tom'].create_belief_state(model='foe')
-    zero = world.agents['Jerry'].zero_level()
-    world.setModel('Jerry', zero, 'Tom', 'friend')
-    world.setModel('Jerry', zero, 'Tom', 'foe')
+    friend = world.agents['Tom'].zero_level(model, name=f'{model}_friend', rationality=rationality, selection='distribution', horizon=1)
+    world.agents['Tom'].setReward(maximizeFeature(stateKey('Jerry', 'health'), 'Tom'), 1, friend)
+    foe = world.agents['Tom'].zero_level(model, name=f'{model}_foe', rationality=rationality, selection='distribution', horizon=1)
+    world.agents['Tom'].setReward(minimizeFeature(stateKey('Jerry', 'health'), 'Tom'), 1, foe)
+#    world.setModel('Jerry', world.agents['Jerry'].zero_level(prefix='friend_'), 'Tom', friend)
+#    world.setModel('Jerry', world.agents['Jerry'].zero_level(prefix='foe_'), 'Tom', foe)
+    return friend, foe
 
 
 def add_beliefs(world):
@@ -236,10 +234,10 @@ def test_reward():
     world = setup_world()
     add_state(world)
     add_reward(world)
-    add_models(world)
+    friend, foe = add_models(world)
     assert world.agents['Tom'].reward() == -world.getState('Jerry', 'health', unique=True)
-    assert world.agents['Tom'].reward(model='foe') == -world.getState('Jerry', 'health', unique=True)
-    assert world.agents['Tom'].reward(model='friend') == world.getState('Jerry', 'health', unique=True)
+    assert world.agents['Tom'].reward(model=foe) == -world.getState('Jerry', 'health', unique=True)
+    assert world.agents['Tom'].reward(model=friend) == world.getState('Jerry', 'health', unique=True)
 
 
 def test_belief_update():
@@ -249,13 +247,12 @@ def test_belief_update():
     add_dynamics(world, actions)
     add_reward(world)
     add_beliefs(world)
-    add_models(world)
+    friend, foe = add_models(world)
+    tom = world.agents['Tom']
     jerry = world.agents['Jerry']
-    world.setModel('Tom', Distribution({'friend': 0.5, 'foe': 0.5}), 'Jerry', jerry.get_true_model())
-    world.step({'Tom': actions['hit']})
-#    for model, belief in jerry.getBelief().items():
-#        print(model)
-#        print(world.getModel('Tom', belief))
+    model = tom.get_true_model(unique=True)
+    world.setModel('Tom', tom.zero_level())
+    world.setModel('Tom', Distribution({friend: 0.5, foe: 0.5}), 'Jerry', jerry.get_true_model())
 
 
 def test_trick():
@@ -276,21 +273,40 @@ def test_zero_level():
     world = setup_world()
     add_state(world)
     actions = add_actions(world, [{'Tom', 'Jerry'}])
+    assert 'Tom' in world.next()
+    assert 'Jerry' in world.next()
     add_trick_dynamics(world, actions)
     add_reward(world)
     jerry = world.agents['Jerry']
     tom = world.agents['Tom']
     jerry0 = jerry.zero_level(horizon=1)
+    beliefs = jerry.getBelief(model=jerry0)
     tom1 = tom.n_level(n=1, models={jerry.name: jerry0}, horizon=1)
     R = jerry.getReward(jerry.get_true_model())   
     R0 = jerry.getReward(jerry0)
-    assert R == R0 
+    assert R == R0
+    jerry.setReward(achieveGoal(stateKey(tom.name, 'tricked'), jerry.name), 1, model=jerry0)
     decision = jerry.decide(model=jerry0, others={tom.name: actions['hit']})
     assert decision['action'] == actions['trick']
     decision = tom.decide(model=tom1, others={jerry.name: actions['trick']})
     assert decision['action'] == actions['chase']
     decision = tom.decide(model=tom1, others={jerry.name: actions['run']})
     assert decision['action'] == actions['hit']
+    decision = tom.decide(model=tom1)
+    assert decision['action'] == actions['chase']
+
+
+def test_one_level():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world, [{'Tom', 'Jerry'}])
+    add_trick_dynamics(world, actions)
+    add_reward(world)
+    jerry = world.agents['Jerry']
+    tom = world.agents['Tom']
+    jerry0 = jerry.zero_level(horizon=1)
+    # world.printState(jerry.getBelief(model=jerry0))
+    tom1 = tom.n_level(n=1, models={jerry.name: jerry0}, horizon=2)
     decision = tom.decide(model=tom1)
     assert decision['action'] == actions['chase']
 
@@ -334,6 +350,9 @@ def test_step_select():
     tom.setAttribute('strict_max', False, tom.get_true_model())
     tom.setAttribute('sample', False, tom.get_true_model())
     tom.setAttribute('tiebreak', False, tom.get_true_model())
+    table = {'chase': 0.006648354478866005,
+             'doNothing': 0.006648354478866005,
+             'hit': 0.9867032910422682}
     # Test full simulation step
     state = copy.deepcopy(world.state)
     prob = world.step(state=state)
@@ -343,20 +362,18 @@ def test_step_select():
     prob = world.step(state=state, select=True)
     assert len(state) == 1
     action = world.getAction(tom.name, state, True)
-    if action == actions['hit']:
-        assert math.isclose(prob, 0.246675822760567)
-    else:
-        raise NotImplementedError(f'Have not recorded whether unlikely probability is {prob}')
+    assert math.isclose(prob, table[action['verb']])
     # Test selection of most likely outcome
     state = copy.deepcopy(world.state)
     prob = world.step(state=state, select='max')
-    assert math.isclose(prob, 0.246675822760567)
+    assert math.isclose(prob, max(table.values()))
     # Test sampling in decision-making
     tom.setAttribute('sample', True, tom.get_true_model())
     state = copy.deepcopy(world.state)
     prob = world.step(state=state)
     action = world.getAction(tom.name, state, True)
-    table = {'chase': 0.006648354478866005,
-             'doNothing': 0.006648354478866005,
-             'hit': 0.9867032910422682}
     assert math.isclose(prob, table[action['verb']])
+
+
+if __name__ == '__main__':
+    test_belief_update()
