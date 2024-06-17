@@ -133,6 +133,8 @@ if __name__ == '__main__':
     app.setOrganizationName('USC ICT')
     app.setOrganizationDomain('ict.usc.edu')
     app.setApplicationName('PsychSim')
+    font = QFont('Open Sans')
+    app.setFont(font)
 
     args = parser.parse_args(args=[str(el) for el in app.arguments()][1:])
     if args.cyclical:
