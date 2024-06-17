@@ -2,10 +2,8 @@ from __future__ import print_function
 import copy
 import inspect
 import logging
-import math
 import multiprocessing
 import os
-import random
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -675,8 +673,7 @@ class Agent(object):
         """
         :param vector: the world in which to test legality
         :param actions: the set of actions to test legality of (default is all available actions)
-        
-    :returns: the set of possible actions to choose from in the given state vector
+        :returns: the set of possible actions to choose from in the given state vector
         :rtype: {L{ActionSet}}
         """
         if vector is None:
@@ -834,8 +831,8 @@ class Agent(object):
                     if tree is None:
                         tree = R
                     else:
-                        tree = {'if': equalRow(modelK,submodel),
-                                 True: R,False: tree}
+                        tree = {'if': equalRow(modelK, submodel),
+                                True: R, False: tree}
                 tree = makeTree(tree).desymbolize(self.world.symbols)
             else:
                 tree = self.getReward(model)
@@ -1285,7 +1282,7 @@ class Agent(object):
             for model in models.domain():
                 if self.getAttribute('beliefs', model) is not True and self.getAttribute('static', model) is not True:
                     # At least one case where I have my own belief state and it is not static
-                    self.updateBeliefsOLD(state,actions,horizon, context=context)
+                    self.updateBeliefsOLD(state, actions, horizon, context=context)
                     break
             else:
                 # No belief change for this agent under any active models
@@ -1528,6 +1525,7 @@ class Agent(object):
             assert len(newDist) > 0
             newDist.normalize()
         return trueState
+
 
 class ValueFunction:
     """
