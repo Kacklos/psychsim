@@ -824,8 +824,8 @@ def makeTree(table, normalize=True):
         keys.remove('case')
         tree = {}
         if 'otherwise' in table:
-            tree[None] = table['otherwise']
             keys.remove('otherwise')
+            tree[None] = table['otherwise']
         tree['if'] = equalRow(table['case'], keys)
         for index, key in enumerate(keys):
             tree[index] = table[key]
