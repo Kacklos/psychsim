@@ -16,10 +16,10 @@ try:
 except:
     __graph__ = False
 
-import csv
 
 gtnodes = {}
-#with open('/home/david/Downloads/Annotated Graph USC v2.0 - graph.tsv','r') as csvfile:
+# import csv
+# with open('/home/david/Downloads/Annotated Graph USC v2.0 - graph.tsv','r') as csvfile:
 #    reader = csv.DictReader(csvfile,delimiter='\t')
 #    for row in reader:
 #        if row['Source'] not in gtnodes:
@@ -69,8 +69,8 @@ class WorldView(QGraphicsScene):
     rowHeight = 100
     colWidth = 150
     
-    def __init__(self,parent = None):
-        super(WorldView,self).__init__(parent)
+    def __init__(self, parent=None):
+        super(WorldView, self).__init__(parent)
         self.setBackgroundBrush(QColor('white'))
         self.nodes = {'state pre': {},
                       'state post': {},
@@ -88,14 +88,14 @@ class WorldView(QGraphicsScene):
         self.xml = None
 
     def clear(self):
-        super(WorldView,self).clear()
+        super(WorldView, self).clear()
         for table in self.nodes.values():
             table.clear()
         self.edgesOut.clear()
         self.edgesIn.clear()
         self.center = None
         
-    def displayWorld(self,agents=None):
+    def displayWorld(self, agents=None):
         self.clear()
 
         self.graph = graph.DependencyGraph(self.world)
@@ -111,7 +111,9 @@ class WorldView(QGraphicsScene):
         # Lay out the post variable nodes
         x = self.drawStateNodes(layout['state post'],self.graph,x,0,'xpost','ypost')
         # Lay out the utility nodes
-        x = self.drawUtilityNodes(x,0,self.graph,sorted(self.world.agents.keys()))
+        u_agents = [a.name for a in self.world.agents.values() 
+                    if len(a.actions) > 1]
+        x = self.drawUtilityNodes(x, 0, self.graph, sorted(u_agents))
         self.colorNodes()
         # Lay out edges
         for key,entry in self.graph.items():
@@ -732,6 +734,7 @@ def initializeNode(node,label):
         rect.setHeight(myRect.height())
     # Vertical centering of label
     node.text.setPos(rect.x(),rect.y()+(rect.height()-myRect.height())/2.)
+
 
 class VariableNode(QGraphicsEllipseItem):
     defaultWidth = 100
