@@ -633,7 +633,9 @@ class Agent(object):
                 # Make me the subject of these actions
                 atom['subject'] = self.name
         new = ActionSet(actions)
-        assert new not in self.actions,'Action %s already defined' % (new)
+        if new in self.actions:
+            return new
+        # assert new not in self.actions, 'Action %s already defined' % (new)
         self.actions.add(new)
         if condition:
             self.setLegal(new, condition)
@@ -1468,14 +1470,11 @@ class Agent(object):
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
                     others = [name for name in self.world.agents if modelKey(name) in beliefs and name != self.name]
-#                    print(forced_actions)
-#                    print(select)
                     obs_prob = self.world.step(actions=forced_actions if forced_actions else None, 
                                                state=beliefs, keySubset=beliefs.keys(), 
                                                horizon=horizon, updateBeliefs=others, 
                                                select=select,
                                                context=f'{context}updating {self.name}\'s beliefs')
-#                    print(obs_prob)
                     if obs_prob > 0:
                         # Create model with these new beliefs
                         # TODO: Look for matching model?
