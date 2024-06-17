@@ -122,9 +122,12 @@ class Action(dict):
                     self.description = str(subchild.data).strip()
             child = child.nextSibling
     
-class ActionSet(frozenset):
 
-    def __new__(cls,elements=[]):
+class ActionSet(frozenset):
+    def __init__(self, elements=[]):
+        self._string = None
+
+    def __new__(cls, elements=[]):
         if isinstance(elements,Element):
             iterable = []
             node = elements.firstChild
@@ -190,7 +193,12 @@ class ActionSet(frozenset):
                     history.add(key)
         
     def __str__(self):
-        return ','.join(map(str,self))
+        if self._string is None:
+            self._string = ','.join(map(str, sorted(self)))
+        return self._string
+
+    def __repr__(self):
+        return str(self)
 
     def __hash__(self):
         return hash(str(self))
