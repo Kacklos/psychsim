@@ -161,7 +161,6 @@ class World(object):
         # Determine the actions taken by the agents in this world
         policies, choices, action_prob = self.delta_action(state, actions, horizon, tiebreak, keySubset, select, debug, context)
         prob *= action_prob
-#        print(prob)
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices, state, keySubset)
         # Update turn order
@@ -253,7 +252,7 @@ class World(object):
                             choices[name] = [decision['action']]
                             policies[name] = makeTree(setToConstantMatrix(action,decision['action'])).desymbolize(self.symbols)
                 elif name in actions:
-                    raise ValueError('Policy generated for %s out of turn' % (name))
+                    raise ValueError(f'Policy generated for {name} out of turn (instead of {", ".join(sorted(self.next()))})')
         if len(policies) == 0:
             self.printState(state)
             raise RuntimeError('Nobody has a turn!')
@@ -1149,7 +1148,10 @@ class World(object):
         else:
             return value
 
-    def getFeature(self,key,state=None,unique=False):
+    def getFeature(self, key, state=None, unique=False):
+        return self.get_feature(key, state, unique)
+
+    def get_feature(self, key, state=None, unique=False):
         """
         :param key: the label of the state element of interest
         :type key: str
@@ -1239,6 +1241,10 @@ class World(object):
         return self.getFeature(actionKey(name), state, unique)
         
     def defineRelation(self,subj,obj,name,domain=float,lo=0.,hi=1.,**kwargs):
+        raise DeprecationWarning('Use define_relation instead')
+
+    def define_relation(self, subj, obj, name, domain=float, lo=0., hi=1.,
+                        **kwargs):
         """
         Defines a binary relationship between two agents
         :param subj: one of the agents in the relation (if a directed link, it is the "origin" of the edge)
@@ -1332,7 +1338,6 @@ class World(object):
                             all_models |= sub_models
                             result[sub_name] = result.get(sub_name, set()) | sub_models
         return result
-
 
     def getMentalModel(self,modelee,vector):
         raise DeprecationWarning('Substitute getModel instead (sorry for pedanticism, but a "model" may be real, not "mental")')
