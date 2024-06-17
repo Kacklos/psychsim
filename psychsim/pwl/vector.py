@@ -333,7 +333,6 @@ class VectorDistribution(Distribution):
                 item[0][key] = value
                 self._Distribution__items[index] = (item[0], item[1])
 
-
     def merge(self, other, inPlace=False):
         """
         Merge two distributions (the passed-in distribution takes precedence over this one in case of conflict)
