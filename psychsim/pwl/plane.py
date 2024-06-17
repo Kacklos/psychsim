@@ -479,20 +479,42 @@ def falseRow(key):
 
 
 def andRow(trueKeys=[], falseKeys=[]):
+    return and_row(trueKeys, falseKeys)
+
+
+def and_row(true_keys=[], false_keys=[]):
     """
-    :param trueKeys: list of keys which must be C{True} (default is empty list)
-    :type trueKeys: str[]
-    :param falseKeys: list of keys which must be C{False} (default is empty list)
-    :type falseKeys: str[]
+    :param true_keys: list of keys which must be C{True} (default is empty list)
+    :type true_keys: str[]
+    :param false_keys: list of keys which must be C{False} (default is empty list)
+    :type false_keys: str[]
     :return: a plane testing whether all boolean keyed values are set as desired
     :rtype: L{KeyedPlane}
     """
     weights = {}
-    for key in trueKeys:
+    for key in true_keys:
         weights[key] = 1
-    for key in falseKeys:
+    for key in false_keys:
         weights[key] = -1
-    return KeyedPlane(KeyedVector(weights), len(trueKeys)-0.5)
+    return KeyedPlane(KeyedVector(weights), len(true_keys)-0.5)
+
+
+def or_row(true_keys=[], false_keys=[]):
+    """
+    :param true_keys: list of keys that will make the result C{True} if any are {True} (default is empty list)
+    :type true_keys: str[]
+    :param false_keys: list of keys that will make the result C{True} if any are {False} (default is empty list)
+    :type false_keys: str[]
+    :return: a plane testing whether any boolean keyed values are set as desired
+    :rtype: L{KeyedPlane}
+    """
+    weights = {CONSTANT: 0}
+    for key in true_keys:
+        weights[key] = 1
+    for key in false_keys:
+        weights[key] = -1
+        weights[CONSTANT] += 1
+    return KeyedPlane(KeyedVector(weights), 0.5)
 
 
 def equalRow(key, value):
