@@ -164,7 +164,7 @@ class Agent(object):
                         print(action)
                         print(mentalModel['policy'])
         return model['V'][horizon]
-                            
+
     def decide(self, state=None, horizon=None, others=None, model=None,
                strict_max=None, sample=None, tiebreak=None,
                selection=None, actions=None, keySet=None, debug={}, 
@@ -393,7 +393,8 @@ class Agent(object):
             while nodes:
                 index = 0
                 while index < len(nodes):
-                    if nodes[index]['__t__'] < horizon:
+                    s = nodes[index]['__S__'][-1]
+                    if nodes[index]['__t__'] < horizon and not self.world.terminated(nodes[index]['__S__'][-1]):
                         nodes[index] = self.expand_value(nodes[index], nodes[index]['__start__'], model, subkeys, horizon, 
                                                          updateBeliefs, samples is not None, debug, context)
                         index += 1
@@ -1224,7 +1225,9 @@ class Agent(object):
     def set_observations(self, unobservable=None):
         if unobservable is None:
             unobservable = set()
-        self.omega = [var for var in self.world.state.keys() if not isModelKey(var) and not isRewardKey(var) and var not in unobservable]
+        self.omega = [var for var in self.world.state.keys() 
+                      if not isModelKey(var) and not isRewardKey(var) 
+                      and var not in unobservable]
         self.omega.append(modelKey(self.name))
 
     def setBelief(self,key,distribution,model=None,state=None):
