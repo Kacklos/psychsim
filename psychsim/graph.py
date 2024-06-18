@@ -116,8 +116,7 @@ class DependencyGraph(dict):
                         dict.__getitem__(self,action)['children'].add(makeFuture(key))
                 # Link between dynamics variables and this feature
                 for parent in tree.getKeysIn() - set([CONSTANT]):
-                    if (state2agent(parent) == WORLD or state2agent(parent) in agents) and \
-                       parent in self:
+                    if (state2agent(parent) == WORLD or state2agent(parent) in agents) and parent in self:
                         dict.__getitem__(self,makeFuture(key))['parents'].add(parent)
                         dict.__getitem__(self,parent)['children'].add(makeFuture(key))
         for name in agents:
