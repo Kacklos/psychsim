@@ -1162,13 +1162,12 @@ class World(object):
         """
         if state is None:
             state = self.state
-        assert key in self.variables or makePresent(key) in self.variables,'Unknown element "%s"' % (key)
         if isinstance(state, KeyedVector):
             return self.float2value(key,state[key])
         else:
             marginal = state.marginal(key)
             if unique:
-                assert len(marginal) == 1, 'Unique value requested for %s, but number of values is %d' % (key, len(marginal))
+                assert len(marginal) == 1, f'Unique value requested for {key}, but number of values is {len(marginal)}'
                 return self.float2value(key, marginal).first()
             else:
                 return self.float2value(key, marginal)
