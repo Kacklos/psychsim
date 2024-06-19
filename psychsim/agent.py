@@ -921,14 +921,15 @@ class Agent(object):
             self.world.variables[modelKey(self.name)]['elements'].append(name)
         return model
 
-    def get_true_model(self, unique=True):
+    def get_true_model(self, state=None, unique=True):
         """
         :return: the name of the "true" model of this agent, i.e., the model by which the real agent is governed in the real world
         :rtype: str
+        :param state: the state from which we wish to extract the true model (default is the true state)
         :param unique: If True, assume there is a unique true model (default is True)
         :type unique: bool
         """
-        return self.world.getModel(self.name, unique=unique)
+        return self.world.getModel(self.name, state, unique)
 
     def zero_level(self, parent_model=None, null=None, name=None, **kwargs) -> str:
         """
@@ -1230,20 +1231,29 @@ class Agent(object):
                       and var not in unobservable]
         self.omega.append(modelKey(self.name))
 
-    def setBelief(self,key,distribution,model=None,state=None):
+    def setBelief(self, key, distribution, model=None, state=None):
+        self.set_belief(key, distribution, model, state)
+
+    def set_belief(self, key, distribution, model=None, state=None):
+        """
+        Sets this agent's belief of the given feature to be the specified distribution
+        :param key: the variable name whose belief we're setting
+        :param distribution: the value (possibly probabilistic) to use for that belief
+        :param model: the model containing the belief to be updated (default is the true model)
+        :param state: the state of the world to derive the models and any beliefs for (default is the true world state)
+        """
         if state is None:
             state = self.world.state
         if model is None:
-            dist = self.world.getModel(self.name,state)
-            for model in dist.domain():
-                self.setBelief(key,distribution,model,state)
+            for model in self.get_true_model(state, False).domain():
+                self.set_belief(key, distribution, model, state)
         try:
             beliefs = self.models[model]['beliefs']
         except KeyError:
             beliefs = True
         if beliefs is True:
-            beliefs = self.resetBelief(state,model)
-        self.world.setFeature(key,distribution,beliefs)
+            beliefs = self.create_belief_state(state, model)
+        self.world.set_feature(key, distribution, beliefs)
 
     def getBelief(self,vector=None,model=None):
         """
