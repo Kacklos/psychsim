@@ -3,13 +3,14 @@ import pickle
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-from pwl.keys import WORLD
-from ui.mainwindow import Ui_MainWindow
-from ui.worldview import WorldView
-from ui.mapview import MapView
-from world import World,loadWorld
+from psychsim.pwl.keys import WORLD
+from psychsim.ui.mainwindow import Ui_MainWindow
+from psychsim.ui.worldview import WorldView
+from psychsim.ui.mapview import MapView
+from psychsim.world import World,loadWorld
 
 settings = QSettings('USC ICT','PsychSim')
+
 
 class PsychSimUI(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
@@ -60,6 +61,7 @@ class PsychSimUI(QMainWindow, Ui_MainWindow):
 
     @pyqtSlot() # signal with no arguments
     def on_actionQuit_triggered(self):
+        global app
         app.quit()
 
     @pyqtSlot() # signal with no arguments
@@ -120,7 +122,8 @@ class PsychSimUI(QMainWindow, Ui_MainWindow):
         factor = 1.41**(-event.pixelDelta().y()/240.)
         self.graphicsView.scale(factor,factor)
 
-if __name__ == '__main__':
+
+def main():
     import argparse
     import sys
 
@@ -129,6 +132,7 @@ if __name__ == '__main__':
                         help='File containing an exising PsychSim scenario')
     parser.add_argument('-c','--cyclical',action='store_true',help='Start with cyclical view of graph')
 
+    global app
     app = QApplication(sys.argv)
     app.setOrganizationName('USC ICT')
     app.setOrganizationDomain('ict.usc.edu')
@@ -153,3 +157,6 @@ if __name__ == '__main__':
     win.showMaximized()
     app.exec_()
 
+
+if __name__ == '__main__':
+    main()
