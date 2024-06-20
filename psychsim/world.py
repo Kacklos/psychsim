@@ -41,7 +41,7 @@ class World(object):
     """
     memory = False
 
-    def __init__(self, xml=None,stateType=VectorDistributionSet):
+    def __init__(self, xml=None, stateType=VectorDistributionSet):
         """
         :param xml: Initialization argument, either an XML Element, or a filename
         :type xml: Node or str
