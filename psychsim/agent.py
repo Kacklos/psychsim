@@ -1156,7 +1156,8 @@ class Agent(object):
     def resetBelief(self, state=None, model=None, include=None, ignore=None, stateType=VectorDistributionSet):
         return self.create_belief_state(state, model, include, ignore, stateType)
 
-    def create_belief_state(self, state=None, model=None, include=None, ignore=None, stateType=VectorDistributionSet):
+    def create_belief_state(self, state=None, model=None, include=None, 
+                            ignore=None, stateType=VectorDistributionSet):
         """
         Handles all combinations of state type and specified belief type
         """
