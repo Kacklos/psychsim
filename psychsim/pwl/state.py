@@ -801,9 +801,8 @@ class VectorDistributionSet:
                 self.update(s, new_keys | branch_keys)
             for k in new_keys:
                 for el, p in self.marginal(k).items():
-                    if abs(p) > 1:
-                        print(k)
-                        raise RuntimeError
+                    if p-1e-8 > 1:
+                        raise ValueError(f'Marginal probability of {k} is > 1')
 
     def __rmul__(self,other):
         if isinstance(other,KeyedVector) or isinstance(other,KeyedTree):
