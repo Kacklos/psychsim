@@ -292,6 +292,12 @@ class Distribution:
         else:
             return self.__class__([(element*other, prob) for element, prob in self.__items])
 
+    def dot(self, other):
+        assert isinstance(other, Distribution), f'Dot product must be with another Distribution, not {other.__class__.__name__}'
+        return self.__class__([(element, prob*other[element]) 
+                               for element, prob in self.__items
+                               if element in other])
+
     def scale_prob(self, factor):
         """
         :return: a new Distribution whose probability values have all been multiplied by the given factor
