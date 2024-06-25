@@ -1343,7 +1343,6 @@ class Agent(object):
                 # Get old belief state.
                 beliefs = copy.deepcopy(original)
                 # Project direct effect of the actions, including possible observations
-                assert oldModel[-4:] != 'zero'
                 outcome = self.world.step({self.name: myAction} if myAction else None, 
                                           beliefs, keySubset=beliefs.keys(),
                                           horizon=horizon, updateBeliefs=False)
