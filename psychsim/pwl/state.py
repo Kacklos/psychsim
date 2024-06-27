@@ -989,10 +989,13 @@ class VectorDistributionSet:
         return result
     
     def __str__(self):
-        uncertain = '\n---\n'.join([str(dist) for dist in self.distributions.values() if len(dist) > 1])
+        uncertain = '\n---\n'.join([str(dist) for dist in self.distributions.values()])
         if self.certain:
             vector = KeyedVector(self.certain)
-            return f'100%\n{vector.sortedString()}\n{uncertain}'
+            if uncertain:
+                return f'100%\n{vector.sortedString()}\n---\n{uncertain}'
+            else:
+                return f'100%\n{vector.sortedString()}'
         else:
             return uncertain
 
