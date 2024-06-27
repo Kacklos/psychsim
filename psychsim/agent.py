@@ -578,8 +578,7 @@ class Agent(object):
 
     def findAttribute(self,name,model):
         """
-        
-    :returns: the name of the nearest ancestor model (include the given model itself) that specifies a value for the named feature
+        :returns: the name of the nearest ancestor model (include the given model itself) that specifies a value for the named feature
         """
         if name in self.models[model]:
             return model
@@ -1154,7 +1153,7 @@ class Agent(object):
     """---------------------"""
 
     def resetBelief(self, state=None, model=None, include=None, ignore=None, stateType=VectorDistributionSet):
-        return self.create_belief_state(state, model, include, ignore, stateType)
+        raise DeprecationWarning('Use create_belief_state instead')
 
     def create_belief_state(self, state=None, model=None, include=None, 
                             ignore=None, stateType=VectorDistributionSet):
@@ -1300,8 +1299,7 @@ class Agent(object):
                     break
             else:
                 # No belief change for this agent under any active models
-                tree = makeTree(noChangeMatrix(my_key))
-                state *= tree
+                state.copy_value(my_key, makeFuture(my_key))
 
     def stateEstimator(self,state,actions,horizon=None):
         if not isinstance(state,KeyedVector):
@@ -1395,7 +1393,8 @@ class Agent(object):
 #            newBelief = self.getBelief(model=newModel)
         return model
 
-    def updateBeliefsOLD(self, trueState=None, actions={}, max_horizon=None, context=''):
+    def updateBeliefsOLD(self, trueState=None, actions={}, max_horizon=None, 
+                         context=''):
         """
         .. warning:: Even if this agent starts with ``True`` beliefs, its beliefs can deviate after actions with stochastic effects (i.e., the world transitions to a specific state with some probability, but the agent only knows a posterior distribution over that resulting state). If you want the agent's beliefs to stay correct, then set the ``static`` attribute on the model to ``True``.
 
@@ -1432,7 +1431,8 @@ class Agent(object):
                 # My beliefs change, but they are accurate
                 old_beliefs = self.models[oldModel]['beliefs']
                 new_beliefs = trueState.copy_subset(include=old_beliefs.keys()-vector.keys())
-                newModel = self.belief2model(oldModel, new_beliefs, find_match=False)['name']
+                newModel = self.belief2model(oldModel, new_beliefs, 
+                                             find_match=False)['name']
                 self.world.setFeature(oldModelKey, newModel, new_beliefs)
                 for key in vector.keys():
                     if key == oldModelKey:
@@ -1449,7 +1449,7 @@ class Agent(object):
                 if self.name in actions:
                     a_key = actionKey(self.name)
                     myAction = self.world.float2value(a_key, vector[a_key] if a_key in vector else trueState.certain[a_key])
-                    logging.debug('{} I perform {}'.format(context, myAction))
+                    logging.debug(f'{context} I perform {myAction}')
                 else:
                     myAction = None
                 if myAction not in SE[omega]:
