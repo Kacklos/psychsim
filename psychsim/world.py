@@ -1667,14 +1667,14 @@ class World(object):
         """
         :return: A string representation of the current world state, including agent beliefs
         """
-        return(self.state2str(self.state))
+        return self.state2str(self.state)
 
     def state2str(self, state: VectorDistributionSet) -> str:
         """
         :return: A string representation of the given world state, including agent beliefs
         """
         buf = StringIO()
-        self.printState(distribution=state, buf=buf)
+        self.printState(state, buf=buf)
         value = buf.getvalue()
         buf.close()
         return value
@@ -1686,27 +1686,28 @@ class World(object):
             print('%s = %s (%d%%)' % (modelKey(name),model,models[model]*100))
             self.agents[name].printModel(model,buf,prefix=prefix,previous=previous)
 
-    def printState(self,distribution=None,buf=None,prefix='',beliefs=True,first=True,models=None):
+    def printState(self, state=None, buf=None, prefix='', beliefs=True,
+                   models=None):
         """
         Utility method for displaying a distribution over possible worlds
-        :type distribution: L{VectorDistribution}
+        :type state: L{VectorDistribution}
         :param buf: the string buffer to put the string representation in (default is standard output)
         :param prefix: a string prefix (e.g., tabs) to insert at the beginning of each line
         :type prefix: str
         :param beliefs: if C{True}, print out inaccurate beliefs, too
         :type beliefs: bool
         """
-        if distribution is None:
-            distribution = self.state
-        print(prefix+str(self.resymbolize(distribution)).replace('\n', '\n%s' % (prefix)), file=buf)
+        if state is None:
+            state = self.state
+        print(f'{prefix}{self.resymbolize(state)}'.replace('\n', f'\n{prefix}'), file=buf)
         if beliefs:
             if models is None:
                 models = set()
             for name in self.agents:
-                if modelKey(name) in distribution:
-                    dist = self.getFeature(modelKey(name),distribution)
+                if modelKey(name) in state:
+                    dist = self.getFeature(modelKey(name), state)
                     for model in sorted(dist.domain()):
-                        self.agents[name].printModel(model,buf,reward=True,previous=models)
+                        self.agents[name].printModel(model, buf, reward=True, previous=models)
 
     def printVector(self,vector,buf=None,prefix='',first=True,beliefs=False,csv=False,models=None):
         """
