@@ -453,9 +453,12 @@ class World(object):
                                beliefs=True, parent=None, projector=Distribution.expectation)
             if setModel:
                 if isinstance(self.state, VectorDistributionSet):
-                    # Initialize model of this agent to be uniform distribution (got a better idea?)
-                    prob = 1./float(len(agent.models))
-                    dist = {model: prob for model in agent.models}
+                    if len(agent.models) > 1:
+                        # Initialize model of this agent to be uniform distribution (got a better idea?)
+                        prob = 1./float(len(agent.models))
+                        dist = {model: prob for model in agent.models}
+                    else:
+                        dist = next(iter(agent.models))
                     self.setModel(agent.name, dist)
                 else:
                     assert len(agent.models) == 1
@@ -1351,18 +1354,15 @@ class World(object):
         # Make sure distribution is probability distribution over floats
         if state is None:
             state = self.state
-        if isinstance(state, VectorDistributionSet):
-            if not isinstance(distribution, dict):
-                distribution = {distribution: 1.}
-            if not isinstance(distribution, psychsim.probability.Distribution):
-                distribution = psychsim.probability.Distribution(distribution)
+        if isinstance(distribution, dict):
+            distribution = psychsim.probability.Distribution(distribution)
         key = modelKey(modelee)
         if isinstance(state, str):
             # This is the name of the modeling agent (*cough* hack *cough*)
             self.agents[state].setBelief(key, distribution, model)
         else:
             # Otherwise, assume we're changing the model in the current state
-            self.setFeature(key, distribution, state)
+            self.set_feature(key, distribution, state)
         
     def setMentalModel(self,modeler,modelee,distribution,model=None):
         """
