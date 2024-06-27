@@ -224,8 +224,11 @@ class World(object):
                         if isinstance(actions[name], Action):
                             actions[name] = ActionSet([actions[name]])
                         if isinstance(select, dict) and action in select:
-                            if actions[name] != self.float2value(action, select[action]):
-                                raise ValueError(f'Forced action {actions[name]} conflicts with selected action {self.float2value(action, select[action])}')
+                            selected_action = select[action]
+                            if isinstance(selected_action, int):
+                                selected_action = self.float2value(action, selected_action)
+                            if actions[name] != selected_action:
+                                raise ValueError(f'Forced action {actions[name]} conflicts with selected action {selected_action}')
                         if isinstance(actions[name], ActionSet):
                             choices[name] = [actions[name]]
                             policies[name] = makeTree(setToConstantMatrix(action,actions[name])).desymbolize(self.symbols)
@@ -401,7 +404,7 @@ class World(object):
             raise DeprecationWarning('Multiple termination conditions no longer supported. Please merge into single boolean PWL tree.')
 
         # Termination state info
-        if not TERMINATED in self.variables:
+        if TERMINATED not in self.variables:
             self.defineState(state2agent(TERMINATED), state2feature(TERMINATED), bool,
                 description="True if and only if a termination condition for this simulation is satisfied")
             self.setFeature(TERMINATED, False)
@@ -417,10 +420,10 @@ class World(object):
         """
         if state is None:
             state = self.state
-        if not TERMINATED in state:
+        if TERMINATED not in state:
             return False
         termination = self.getValue(TERMINATED,state)
-        if isinstance(termination,Distribution):
+        if isinstance(termination, Distribution):
             termination = termination[True] == 1.
         return termination
 
@@ -1234,6 +1237,9 @@ class World(object):
         return self.getFeature(stateKey(entity,feature),state,unique)
 
     def getAction(self, name=None, state=None, unique=False):
+        return self.get_action(name, state, unique)
+
+    def get_action(self, name=None, state=None, unique=False):
         """
         :return: the C{ActionSet} last performed by the given entity
         """
@@ -1642,7 +1648,7 @@ class World(object):
         elif isinstance(state, VectorDistributionSet):
             result = state.__class__()
             result.certain = self.resymbolize(state.certain)
-            for substate,distribution in state.distributions.items():
+            for substate, distribution in state.distributions.items():
                 result.distributions[substate] = self.resymbolize(distribution)
                 for key in distribution.keys():
                     result.keyMap[key] = substate
