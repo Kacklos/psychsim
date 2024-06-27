@@ -807,47 +807,48 @@ class Agent(object):
         else:
             return R
         
-    def reward(self,vector=None,model=None,recurse=True):
+    def reward(self, state=None, model=None, recurse=True):
         """
         :param recurse: ``True`` iff it is OK to recurse into another agent's reward (default is ``True``)
         :type recurse: bool
-        
-    :returns: the reward I derive in the given state (under the given model, default being the ``True`` model)
+        :returns: the reward I derive in the given state (under the given model, default being the ``True`` model)
         :rtype: float
         """
         total = 0.
-        if vector is None:
-            total = self.reward(self.world.state,model,recurse)
-        elif isinstance(vector,VectorDistribution):
-            for element in vector.domain():
-                total += vector[element]*self.reward(element,model,recurse)
-        elif isinstance(vector,VectorDistributionSet):
+        if state is None:
+            total = self.reward(self.world.state, model, recurse)
+        elif isinstance(state, VectorDistribution):
+            for element in state.domain():
+                total += state[element]*self.reward(element, model, recurse)
+        elif isinstance(state, VectorDistributionSet):
             if model is None:
-                modelK = modelKey(self.name)
-                models = self.world.float2value(modelK,vector.domain(modelK))
-                tree = None
-                for submodel in models:
-                    R = self.getReward(submodel)
-                    if tree is None:
-                        tree = R
-                    else:
-                        tree = {'if': equalRow(modelK, submodel),
-                                True: R, False: tree}
+                models = self.world.getModel(self.name, state)
+                if len(models) > 1:
+                    tree = None
+                    for submodel, prob in models.items():
+                        R = self.getReward(submodel)
+                        if tree is None:
+                            tree = R*prob
+                        else:
+                            tree = {'if': equalRow(modelK, submodel),
+                                    True: R*prob, False: tree}
+                else:
+                    tree = self.getReward(models.first())
                 tree = makeTree(tree).desymbolize(self.world.symbols)
             else:
                 tree = self.getReward(model)
             if tree is None:
                 raise ValueError('Agent "{} has no reward function defined (model "{}")'.format(self.name, model))
-            vector *= tree
-            if not rewardKey(self.name) in vector:
-                vector.join(rewardKey(self.name),0.)
-            vector.rollback()
-            total = vector[rewardKey(self.name)].expectation()
+            state *= tree
+            if not rewardKey(self.name) in state:
+                state.join(rewardKey(self.name),0.)
+            state.rollback()
+            total = state[rewardKey(self.name)].expectation()
         else:
             tree = self.getReward(model)
-            vector *= tree
-            vector.rollback()
-            total = float(vector[rewardKey(self.name)])
+            state *= tree
+            state.rollback()
+            total = float(state[rewardKey(self.name)])
         return total
 
     def printReward(self, model=True, buf=None, prefix=''):
