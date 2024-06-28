@@ -44,6 +44,11 @@ def add_actions(world, order=None):
     return actions
 
 
+def add_deterministic_dynamics(world, actions):
+    tree = makeTree(approachMatrix(stateKey('Jerry', 'health'), .1, 0))
+    world.setDynamics(stateKey('Jerry', 'health'), actions['hit'], tree)
+
+
 def add_dynamics(world, actions):
     tree = makeTree({'distribution': [(approachMatrix(stateKey('Jerry', 'health'), .1, 0), 0.5),
                                       (noChangeMatrix(stateKey('Jerry', 'health')), 0.5)]})
@@ -120,10 +125,12 @@ def test_legality():
     actions = add_actions(world, ['Tom'])
     action = actions['hit']
     value = world.getState('Tom', 'health', unique=True)
-    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), value-5), True: True, False: False})
+    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), value-5), 
+                     True: True, False: False})
     world.agents['Tom'].setLegal(action, tree)
     assert action in world.agents['Tom'].getLegalActions()
-    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), value+5), True: True, False: False})
+    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), value+5), 
+                     True: True, False: False})
     world.agents['Tom'].setLegal(action, tree)
     assert action not in world.agents['Tom'].getLegalActions()
 
@@ -194,7 +201,7 @@ def test_disjunction():
     add_state(world)
     actions = add_actions(world, ['Tom'])
     tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), threshold) | thresholdRow(stateKey('Jerry', 'health'), threshold),
-                     True: incrementMatrix(stateKey('Jerry', 'health'),-delta),
+                     True: incrementMatrix(stateKey('Jerry', 'health'), -delta),
                      False: noChangeMatrix(stateKey('Jerry', 'health'))})
     assert not tree.branch.isConjunction
     world.setDynamics(stateKey('Jerry', 'health'), actions['hit'],tree)
@@ -240,19 +247,63 @@ def test_reward():
     assert world.agents['Tom'].reward(model=friend) == world.getState('Jerry', 'health', unique=True)
 
 
-def test_belief_update():
+def test_model_update():
     world = setup_world()
     add_state(world)
     actions = add_actions(world)
-    add_dynamics(world, actions)
+    add_deterministic_dynamics(world, actions)
     add_reward(world)
+    tom = world.agents['Tom']
+    world.setModel('Tom', tom.zero_level())
     add_beliefs(world)
     friend, foe = add_models(world)
-    tom = world.agents['Tom']
     jerry = world.agents['Jerry']
-    model = tom.get_true_model(unique=True)
+    model = jerry.get_true_model(unique=True)
+    b_i = Distribution({friend: 0.7})
+    b_i[foe] = 1-b_i[friend]
+    world.setModel('Tom', b_i, 'Jerry', model)
+    for m in b_i.domain():
+        tom.setAttribute('rationality', 0.1, model=m)
+    # What are our expectations about these two models?
+    p_a = Distribution({m: tom.decide(model=m)['action'][actions['hit']] 
+                        for m in b_i.domain()})
+    world.step({'Tom': actions['hit']})
+    b_jerry = jerry.getBelief()
+    assert len(b_jerry) == 1, 'Multiple models returned after deterministic step'
+    b_f = world.getModel(tom.name, next(iter(b_jerry.values())))
+    se = b_i.dot(p_a)
+    se.normalize()
+    for m, p_m in b_f.items():
+        assert math.isclose(se[tom.models[m]['parent']], p_m)
+
+
+def test_model_contradiction():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world)
+    add_deterministic_dynamics(world, actions)
+    add_reward(world)
+    tom = world.agents['Tom']
     world.setModel('Tom', tom.zero_level())
-    world.setModel('Tom', Distribution({friend: 0.5, foe: 0.5}), 'Jerry', jerry.get_true_model())
+    add_beliefs(world)
+    friend, foe = add_models(world)
+    jerry = world.agents['Jerry']
+    model = jerry.get_true_model(unique=True)
+    b_i = Distribution({friend: 0.7})
+    b_i[foe] = 1-b_i[friend]
+    world.setModel('Tom', b_i, 'Jerry', model)
+    # Use a strict max, so friend Tom would never hit Jerry
+    for m in b_i.domain():
+        tom.setAttribute('selection', 'consistent', model=m)
+    # What are our expectations about these two models?
+    p_a = Distribution({m: 1 if tom.decide(model=m)['action'] == actions['hit'] else 0 
+                        for m in b_i.domain()})
+    world.step({'Tom': actions['hit']})
+    b_jerry = jerry.getBelief()
+    assert len(b_jerry) == 1, 'Multiple models returned after deterministic step'
+    b_f = world.getModel(tom.name, next(iter(b_jerry.values())))
+    assert len(b_f) == 1
+    assert tom.models[b_f.first()]['parent'] == foe
 
 
 def test_trick():
@@ -285,7 +336,8 @@ def test_zero_level():
     R = jerry.getReward(jerry.get_true_model())   
     R0 = jerry.getReward(jerry0)
     assert R == R0
-    jerry.setReward(achieveGoal(stateKey(tom.name, 'tricked'), jerry.name), 1, model=jerry0)
+    jerry.setReward(achieveGoal(stateKey(tom.name, 'tricked'), jerry.name), 1, 
+                    model=jerry0)
     decision = jerry.decide(model=jerry0, others={tom.name: actions['hit']})
     assert decision['action'] == actions['trick']
     decision = tom.decide(model=tom1, others={jerry.name: actions['trick']})
