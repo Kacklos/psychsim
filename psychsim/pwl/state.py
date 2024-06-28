@@ -338,7 +338,9 @@ class VectorDistributionSet:
             raise DeprecationWarning('If you really need this, please inform management.')
             return set()
         elif ignoreCertain:
-            return {self.keyMap[k] for k in obj if k != keys.CONSTANT and self.keyMap[k] is not None and len(self.distributions[self.keyMap[k]]) > 1}
+            return {self.keyMap[k] for k in obj if k != keys.CONSTANT and 
+                    self.keyMap[k] is not None and 
+                    len(self.distributions[self.keyMap[k]]) > 1}
         else:
             return {self.keyMap[k] for k in obj if k != keys.CONSTANT}
 
