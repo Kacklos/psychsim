@@ -34,6 +34,14 @@ class KeyedTree:
     def isLeaf(self):
         return self.leaf
 
+    def depth(self, result=0):
+        if self.isLeaf():
+            return result
+        elif self.isProbabilistic():
+            return max([child.depth(result+1) for child in self.children.domain()])
+        else:
+            return max([child.depth(result+1) for child in self.children.values()])
+
     def getLeaf(self):
         return self.children[None]
 
@@ -526,7 +534,7 @@ class KeyedTree:
                 for child, prob in self.children._Distribution__items:
                     try:
                         child.select(leaf_test)
-                        self.children.set(child)
+                        self.children.set(child, normalize=False)
                         return prob
                     except ValueError:
                         pass
