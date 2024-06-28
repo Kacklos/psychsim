@@ -244,15 +244,22 @@ class World(object):
                             handled = False
                             if isinstance(decision['policy'], KeyedTree):
                                 pi = decision['policy']
-                                if pi.depth() == 2 and not pi.isProbabilistic():
+                                if 1 <= pi.depth() <= 2 and not pi.isProbabilistic():
                                     if len(pi.branch.planes) == 1:
                                         vec, t, op = pi.branch.planes[0]
                                         if len(vec) == 1 and next(iter(vec.keys())) == modelKey(name):
                                             assert op == 0, 'Model branch that is an inequality?!'
                                             handled = True
                                             for i, child in list(pi.children.items()):
-                                                p = child.select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
-                                                assert p > 0, 'Have not yet implemented what happens if observed action has 0 probability'
+                                                try:
+                                                    p = child.select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
+                                                    assert p > 0, 'Have not yet implemented what happens if observed action has 0 probability'
+                                                except ValueError:
+                                                    del t[i]
+                                                    for j in range(i+1, len(pi.children)):
+                                                        tmp = pi.children[j]
+                                                        del pi.children[j]
+                                                        pi.children[j-1] = tmp
                                             action_prob = decision.get('probability', 1)
                             if not handled:
                                 action_prob = decision['policy'].select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
