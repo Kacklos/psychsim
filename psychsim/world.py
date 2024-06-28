@@ -239,7 +239,23 @@ class World(object):
                         decision = self.agents[name].decide(state=state, horizon=horizon, others=actions, debug=debug.get(name, {}), context=context)
                         if isinstance(select, dict) and action in select:
                             action_selection = self.float2value(action, select[action])
-                            action_prob = decision['policy'].select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
+                            # Special handling of case of a policy branching on possible models
+                            # TODO: multiple models without special handling
+                            handled = False
+                            if isinstance(decision['policy'], KeyedTree):
+                                pi = decision['policy']
+                                if pi.depth() == 2 and not pi.isProbabilistic():
+                                    if len(pi.branch.planes) == 1:
+                                        vec, t, op = pi.branch.planes[0]
+                                        if len(vec) == 1 and next(iter(vec.keys())) == modelKey(name):
+                                            assert op == 0, 'Model branch that is an inequality?!'
+                                            handled = True
+                                            for i, child in list(pi.children.items()):
+                                                p = child.select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
+                                                assert p > 0, 'Have not yet implemented what happens if observed action has 0 probability'
+                                            action_prob = decision.get('probability', 1)
+                            if not handled:
+                                action_prob = decision['policy'].select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
                         elif select:
                             action_prob = decision['policy'].select()
                         else:
