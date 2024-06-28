@@ -1406,8 +1406,10 @@ class Agent(object):
         newModelKey = makeFuture(oldModelKey)
         # Find distribution over current belief models
         if isinstance(self.omega, list):
-            substate = trueState.collapse(self.omega+[oldModelKey])
+            omega_list = [o for o in self.omega if o in trueState]
+            substate = trueState.collapse(omega_list+[oldModelKey])
         else:
+            omega_list = None
             substate = trueState.keyMap[oldModelKey]
         trueState.keyMap[newModelKey] = substate
         if substate is None:
@@ -1428,7 +1430,7 @@ class Agent(object):
             else:
                 horizon = max_horizon
             logging.debug(f'{context} {self.name} updating |beliefs|={len(vector)} under model {oldModel} (horizon={horizon})')
-            if self.omega is True:
+            if omega_list is None:
                 # My beliefs change, but they are accurate
                 old_beliefs = self.models[oldModel]['beliefs']
                 new_beliefs = trueState.copy_subset(include=old_beliefs.keys()-vector.keys())
@@ -1444,7 +1446,7 @@ class Agent(object):
                 obs_prob = 1
             else:
                 SE = self.models[oldModel]['SE']
-                omega = tuple([vector.get(o) if o in vector else trueState.certain[o] for o in self.omega])
+                omega = tuple([vector.get(o) if o in vector else trueState.certain[o] for o in omega_list])
                 if omega not in SE:
                     SE[omega] = {}
                 if self.name in actions:
@@ -1468,7 +1470,7 @@ class Agent(object):
                     original = self.getBelief(model=oldModel)
                     Omega = self.getAttribute('omega', oldModel)
                     if Omega is None:
-                        Omega = self.omega
+                        Omega = omega_list
                     select = {o: vector[o] if o in vector else trueState.certain[o] for o in Omega}
                     forced_actions = {}
                     for name, action in actions.items():
