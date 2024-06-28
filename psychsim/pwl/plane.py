@@ -1,10 +1,10 @@
-import operator
-from xml.dom.minidom import Node,Document
+from xml.dom.minidom import Node, Document
 
 from psychsim.pwl.keys import CONSTANT
 from psychsim.pwl.vector import KeyedVector
 from psychsim.probability import Distribution
 from psychsim.action import ActionSet
+
 
 class KeyedPlane:
     """
@@ -18,14 +18,14 @@ class KeyedPlane:
     """
     DEFAULT_THRESHOLD = 0.
     DEFAULT_COMPARISON = 1
-    COMPARISON_MAP = ['==','>','<']
+    COMPARISON_MAP = ['==', '>', '<']
 
     def __init__(self,planes,threshold=None,comparison=None):
         """
         :warning: if S{planes} is a list, then S{threshold} and S{comparison} are ignored
         """
         if isinstance(planes,Node):
-            self.parse(planes)
+            raise DeprecationWarning('XML format no longer supported')
         elif isinstance(planes,KeyedVector):
             # Only a single branch passed
             if threshold is None:
