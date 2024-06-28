@@ -750,6 +750,15 @@ class VectorDistributionSet:
                         # Test this vector against the hyperplane
                         test = other.branch.evaluate(vector[keys.VALUE], p_index)
                         del vector[keys.VALUE]
+                        if test not in other.children:
+                            # There may not be a branch for this value, 
+                            # because we determined it has 0 probability.
+                            # Or maybe we just forgot.
+                            if test is None:
+                                logging.warning('Missing fallback branch in tree:\n%s' % (str(other)))
+                            else:
+                                logging.warning('Missing branch for value %s in tree:\n%s' % (test, str(other)))
+                            continue
                         if test in states:
                             if len(vector) > 1:
                                 # Merge in this vector's keys with an existing matching test result
@@ -787,12 +796,6 @@ class VectorDistributionSet:
                     if len(s.distributions[valSub]) == 0:
                         del s.distributions[valSub]
             assert states, 'Empty result of multiplication'
-            for test in states:
-                if test not in other.children:
-                    if test is None:
-                        logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
-                    else:
-                        logging.error('Missing branch for value %s in tree:\n%s' % (test, str(other)))
             self.multiply_tree(other.children[first], probability*states[first][1], select)
             del states[first]
             new_keys = set(other.getKeysOut())
