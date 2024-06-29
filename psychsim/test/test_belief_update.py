@@ -429,5 +429,37 @@ def test_step_select():
     assert math.isclose(prob, table[action['verb']])
 
 
-if __name__ == '__main__':
-    test_belief_update()
+def test_uncertain_beliefs(tricked=False):
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world)
+    add_dynamics(world, actions)
+    add_trick_dynamics(world, actions)
+    tom = world.agents['Tom']
+    var = stateKey(tom.name, 'tricked')
+    world.set_feature(var, tricked)
+    add_reward(world)
+    tom.create_belief_state()
+    jerry = world.agents['Jerry']
+    jerry0 = jerry.zero_level(horizon=1, strict_max=False, tiebreak=False)
+    world.setModel(jerry.name, jerry0, jerry.name)
+    world.setModel(jerry.name, jerry0, tom.name)
+    tom0 = tom.zero_level(horizon=1, strict_max=False, tiebreak=False)
+    world.setModel(tom.name, tom0, jerry.name)
+    # Jerry isn't sure whether Tom has been tricked or not
+    jerry.set_observations([var])
+    jerry.set_belief(var, Distribution({True: 0.75, False: 0.25}))
+    # Tom hits Jerry
+    world.step({'Tom': actions['hit']}, select=True)
+    # Based on the outcome, Jerry probably knows now whether Tom was tricked
+    b_jerry = jerry.get_belief(model=jerry.get_true_model())
+    b_tricked = world.get_feature(var, b_jerry)
+    if tricked:
+        if tom.getState('health', unique=True) > 50 or \
+           jerry.get_state('health', unique=True) > 50:
+            assert len(b_tricked) == 1 and b_tricked.first()
+    else:
+        if tom.getState('health', unique=True) < 50 or \
+           jerry.get_state('health', unique=True) < 50:
+            assert len(b_tricked) == 1 and not b_tricked.first()
+        test_uncertain_beliefs(True)
