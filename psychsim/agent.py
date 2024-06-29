@@ -747,8 +747,11 @@ class Agent(object):
         """        
         return self.world.setState(self.name, feature, value, state, noclobber, recurse)
 
-    def getState(self,feature,state=None,unique=False):
-        return self.world.getState(self.name,feature,state,unique)
+    def getState(self, feature, state=None, unique=False):
+        return self.get_state(feature, state, unique)
+
+    def get_state(self, feature, state=None, unique=False):
+        return self.world.get_state(self.name, feature, state, unique)
 
     """------------------"""
     """Reward methods"""
@@ -951,13 +954,12 @@ class Agent(object):
                        'tiebreak': False}
             default.update(kwargs)
             model = self.addModel(name, parent=parent_model, level=0,
-                                  # policy=makeTree({'distribution': [(action, prob) for action in self.actions]}),
                                   **default)
             parent_belief = self.getBelief(model=parent_model)
             ignore = {k for k in parent_belief.keys() 
                       if isModelKey(k) and state2agent(k) != self.name}
-            ignore |= {k for k in parent_belief.keys() 
-                       if isTurnKey(k) and state2agent(k) != self.name}
+            # ignore |= {k for k in parent_belief.keys() 
+            #            if isTurnKey(k) and state2agent(k) != self.name}
             beliefs = self.create_belief_state(ignore=ignore, model=model['name'])
             self.world.setFeature(modelKey(self.name), model['name'], beliefs)
         else:
@@ -1256,7 +1258,10 @@ class Agent(object):
             beliefs = self.create_belief_state(state, model)
         self.world.set_feature(key, distribution, beliefs)
 
-    def getBelief(self,vector=None,model=None):
+    def getBelief(self, vector=None, model=None):
+        return self.get_belief(vector, model)
+
+    def get_belief(self, vector=None, model=None):
         """
         :param model: the model of the agent to use, default is to use model specified in the state vector
         :returns: the agent's belief in the given world
@@ -1264,19 +1269,19 @@ class Agent(object):
         if vector is None:
             vector = self.world.state
         if model is None:
-            model = self.world.getModel(self.name,vector)
-        if isinstance(model,Distribution):
-            return {element: self.getBelief(vector,element) \
+            model = self.world.getModel(self.name, vector)
+        if isinstance(model, Distribution):
+            return {element: self.getBelief(vector, element) 
                     for element in model.domain()}
         else:
             beliefs = self.getAttribute('beliefs', model)
             if beliefs.__class__ is dict:
-                logging.warning('%s has extraneous layer of nesting in beliefs' % (self.name))
+                logging.warning(f'{self.name} has extraneous layer of nesting in beliefs')
                 beliefs = beliefs[model]
             if beliefs is True:
                 world = copy.deepcopy(vector)
             else:
-                world = beliefs # copy.deepcopy(beliefs)
+                world = beliefs
             others = self.getAttribute('models', model)
             if others:
                 self.world.setFeature(modelKey(self.name), model, world)
