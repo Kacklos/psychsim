@@ -1251,7 +1251,10 @@ class World(object):
         """
         self.setFeature(stateKey(entity, feature), value, state, noclobber, recurse)
 
-    def getState(self,entity,feature,state=None,unique=False):
+    def getState(self, entity, feature, state=None, unique=False):
+        return self.get_state(entity, feature, state, unique)
+
+    def get_state(self, entity, feature, state=None, unique=False):
         """
         For backward compatibility
         :param entity: the name of the entity of interest (C{None} if the feature of interest is of the world itself)
