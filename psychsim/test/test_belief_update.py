@@ -155,7 +155,7 @@ def test_default_branch():
 def test_conjunction():
     world = setup_world()
     add_state(world)
-    actions = add_actions(world,['Tom'])
+    actions = add_actions(world, ['Tom'])
     tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), 50) & thresholdRow(stateKey('Jerry', 'health'), 50),
                      True: incrementMatrix(stateKey('Jerry', 'health'), -5),
                      False: noChangeMatrix(stateKey('Jerry', 'health'))})
@@ -374,10 +374,12 @@ def test_selection():
     model = tom.get_true_model()
     result = tom.decide()
     verify_decision(result, model, ActionSet)
+    assert result[model]['action'] == actions['hit']
     result = tom.decide(selection='softmax')
     verify_decision(result, model, ActionSet)
     result = tom.decide(selection='distribution')
     verify_decision(result, model, Distribution, len(tom.actions))
+    assert result[model]['action'].max() == actions['hit']
 
 
 def verify_decision(result, model: str, cls, length=None):
