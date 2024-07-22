@@ -1,6 +1,3 @@
-import math
-import os
-
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -116,12 +113,18 @@ class WorldView(QGraphicsScene):
         x = self.drawUtilityNodes(x, 0, self.graph, sorted(u_agents))
         self.colorNodes()
         # Lay out edges
-        for key,entry in self.graph.items():
+        for key, entry in self.graph.items():
+            self_edge = not isinstance(key, str) or isFuture(key) or key in self.world.agents
             if key in self.nodes[entry['type']]:
                 node = self.nodes[entry['type']][key]
                 for child in entry['children']:
                     if child in self.nodes[self.graph[child]['type']]:
                         self.drawEdge(key,child)
+                        if not self_edge and child == makeFuture(key):
+                            self_edge = True
+            if not self_edge:
+                if key not in self.world.dynamics or True not in self.world.dynamics[key]:
+                    self.drawEdge(key, makeFuture(key))
 
     def displayGroundTruth(self,agent=WORLD,x0=0,y0=0,maxRows=10,recursive=False,selfCycle=False):
         if agent == WORLD:
@@ -796,6 +799,7 @@ class ActionNode(QGraphicsRectItem):
     defaultColor = 'wheat'
 
     def __init__(self,agent,action,x=None,y=None,w=None,h=None,scene=None):
+        print(agent.world.diagram)
         if x is None:
             x = agent.world.diagram.getX(action)
         if y is None:

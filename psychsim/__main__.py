@@ -28,6 +28,8 @@ class PsychSimUI(QMainWindow, Ui_MainWindow):
     def openScenario(self, filename):
         if os.path.splitext(filename)[1] == '.psy':
             self.world = loadWorld(filename)
+            for agent in self.world.agents.values():
+                assert agent.world is self.world
 #                    msg = QMessageBox()
 #                    msg.setIcon(QMessageBox.Warning)
 #                    msg.setText('Scenario file saved under different version of Python')
