@@ -563,20 +563,20 @@ class WorldView(QGraphicsScene):
     def updateEdges(self,key,rect):
         self.setDirty()
         if key in self.edgesOut:
-            for subkey,(edge,arrow) in self.edgesOut[key].items():
+            for subkey, (edge, arrow) in list(self.edgesOut[key].items()):
                 if self.center is None or key in self.center or subkey in self.center:
-                    if isinstance(edge,QGraphicsLineItem):
+                    if isinstance(edge, QGraphicsLineItem):
                         line = edge.line()
                         line.setP1(QPointF(rect.x()+rect.width(),rect.y()+rect.height()/2))
                         edge.setLine(line)
-                        drawArrow(line,arrow=arrow)
+                        drawArrow(line, arrow=arrow)
                     elif key != subkey:
                         edge.scene().removeItem(edge)
                         del self.edgesOut[key][subkey]
                         del self.edgesIn[subkey][key]
-                        self.drawEdge(key,subkey,rect0=rect)
+                        self.drawEdge(key, subkey, rect0=rect)
         if key in self.edgesIn:
-            for subkey,(edge,arrow) in self.edgesIn[key].items():
+            for subkey,(edge,arrow) in list(self.edgesIn[key].items()):
                 if self.center is None or key in self.center or subkey in self.center:
                     if isinstance(edge,QGraphicsLineItem):
                         line = edge.line()
@@ -602,6 +602,12 @@ class WorldView(QGraphicsScene):
                 if mode == 'agent':
                     if node.agent:
                         if node.agent.color:
+                            obj_color = None
+                            if isinstance(node, ActionNode):
+                                if node.action['object']:
+                                    obj_color = node.agent.world.agents[node.action['object']].color
+                            if obj_color:
+                                pass
                             if isinstance(node.agent.color, str):
                                 color = QColor(node.agent.color)
                             else:
@@ -783,6 +789,7 @@ class VariableNode(QGraphicsEllipseItem):
                 self.scene().world.variables[key]['ypre'] = int(rect.y())
         return QGraphicsEllipseItem.itemChange(self,change,value)
 
+
 class ActionNode(QGraphicsRectItem):
     defaultWidth = 100
     defaultHeight = 50
@@ -813,7 +820,8 @@ class ActionNode(QGraphicsRectItem):
             self.scene().updateEdges(self.action,rect)
             self.action.x = int(rect.x())
             self.action.y = int(rect.y())
-        return QGraphicsEllipseItem.itemChange(self,change,value)
+        return QGraphicsRectItem.itemChange(self,change,value)
+
 
 class UtilityNode(QGraphicsPolygonItem):
     defaultColor = 'wheat'
@@ -833,7 +841,7 @@ class UtilityNode(QGraphicsPolygonItem):
     def itemChange(self,change,value):
         if change == QGraphicsItem.ItemPositionHasChanged:
             self.scene().updateEdges(self.agent.name,self.sceneBoundingRect())
-        return QGraphicsEllipseItem.itemChange(self,change,value)
+        return QGraphicsPolygonItem.itemChange(self,change,value)
 
 def dist2color(distribution):
     """
