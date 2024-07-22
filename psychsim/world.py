@@ -1933,4 +1933,7 @@ def loadWorld(filename):
     if filename[-4:] != '.psy':
         filename = '%s.psy' % (filename)
     f = bz2.BZ2File(filename,'rb')
-    return pickle.load(f)
+    world = pickle.load(f)
+    for agent in world.agents.values():
+        agent.world = world
+    return world
