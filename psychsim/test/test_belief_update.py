@@ -275,6 +275,7 @@ def test_model_update():
     se.normalize()
     for m, p_m in b_f.items():
         assert math.isclose(se[tom.models[m]['parent']], p_m)
+    world.step()
 
 
 def test_model_contradiction():
@@ -451,6 +452,7 @@ def test_uncertain_beliefs(tricked=False):
     jerry.set_belief(var, Distribution({True: 0.75, False: 0.25}))
     # Tom hits Jerry
     world.step({'Tom': actions['hit']}, select=True)
+    assert len(world.state) == 1, 'Uncertainty in state even after selection'
     # Based on the outcome, Jerry probably knows now whether Tom was tricked
     b_jerry = jerry.get_belief(model=jerry.get_true_model())
     b_tricked = world.get_feature(var, b_jerry)
@@ -463,3 +465,4 @@ def test_uncertain_beliefs(tricked=False):
            jerry.get_state('health', unique=True) < 50:
             assert len(b_tricked) == 1 and not b_tricked.first()
         test_uncertain_beliefs(True)
+    world.step()
