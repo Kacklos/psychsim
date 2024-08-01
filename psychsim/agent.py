@@ -944,8 +944,13 @@ class Agent(object):
             # A fixed action policy is desired
             if name is None:
                 name = f'{parent_model}_null'
-            model = self.addModel(name, parent=parent_model, 
-                                  horizon=0, beliefs=None, static=True,
+            if 'horizon' not in kwargs:
+                kwargs['horizon'] = 0
+            if 'beliefs' not in kwargs:
+                kwargs['beliefs'] = None
+            if 'static' not in kwargs:
+                kwargs['static'] = True
+            model = self.addModel(name, parent=parent_model,
                                   policy=makeTree(null), level=0, **kwargs)
         elif self.actions:
             if name is None:
@@ -1414,8 +1419,9 @@ class Agent(object):
             omega_list = [o for o in self.omega if o in trueState]
             substate = trueState.collapse(omega_list+[oldModelKey])
         else:
+            assert self.omega is True, 'Unspecified, but also un-True, observations'
             omega_list = None
-            substate = trueState.keyMap[oldModelKey]
+            substate = trueState.collapse(trueState.keys())
         trueState.keyMap[newModelKey] = substate
         if substate is None:
             # No uncertainty
