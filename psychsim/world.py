@@ -250,16 +250,24 @@ class World(object):
                                         if len(vec) == 1 and next(iter(vec.keys())) == modelKey(name):
                                             assert op == 0, 'Model branch that is an inequality?!'
                                             handled = True
-                                            for i, child in list(pi.children.items()):
+                                            i = 0
+                                            while i < len(pi.children):
+                                                child = pi.children[i]
                                                 try:
                                                     p = child.select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
                                                     assert p > 0, 'Have not yet implemented what happens if observed action has 0 probability'
+                                                    i += 1
                                                 except ValueError:
                                                     del t[i]
-                                                    for j in range(i+1, len(pi.children)):
-                                                        tmp = pi.children[j]
-                                                        del pi.children[j]
-                                                        pi.children[j-1] = tmp
+                                                    if i+1 == len(pi.children):
+                                                        # Last element, nothing to slide down
+                                                        del pi.children[i]
+                                                    else:
+                                                        for j in range(i+1, len(pi.children)):
+                                                            tmp = pi.children[j]
+                                                            del pi.children[j]
+                                                            pi.children[j-1] = tmp
+                                                    pi._string = None
                                             action_prob = decision.get('probability', 1)
                             if not handled:
                                 action_prob = decision['policy'].select(lambda m, a=action_selection: m[makeFuture(action)][CONSTANT] == a)
@@ -276,7 +284,7 @@ class World(object):
                             policies[name] = policies[name].desymbolize(self.symbols)
                         except KeyError:
                             choices[name] = [decision['action']]
-                            policies[name] = makeTree(setToConstantMatrix(action,decision['action'])).desymbolize(self.symbols)
+                            policies[name] = makeTree(setToConstantMatrix(action, decision['action'])).desymbolize(self.symbols)
                 elif name in actions:
                     raise ValueError(f'Policy generated for {name} out of turn (instead of {", ".join(sorted(self.next()))})')
         if len(policies) == 0:
@@ -1372,6 +1380,15 @@ class World(object):
                             all_models |= sub_models
                             result[sub_name] = result.get(sub_name, set()) | sub_models
         return result
+
+    def print_belief_tree(self, tree=None, prefix=''):
+        if tree is None:
+            tree = {}
+            self.get_current_models(tree=tree)
+        for agent, beliefs in tree.items():
+            for model, subtree in beliefs.items():
+                print(f'{prefix}{agent}:{model}')
+                self.print_belief_tree(subtree, prefix+'\t')
 
     def getMentalModel(self,modelee,vector):
         raise DeprecationWarning('Substitute getModel instead (sorry for pedanticism, but a "model" may be real, not "mental")')
