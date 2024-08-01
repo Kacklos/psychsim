@@ -207,25 +207,25 @@ class KeyedPlane:
             else:
                 return False
 
-    def desymbolize(self,table,debug=False):
-        planes = [(p[0].desymbolize(table), self.desymbolizeThreshold(p[1],table),p[2])
+    def desymbolize(self, table, debug=False):
+        planes = [(p[0].desymbolize(table), self._desymbolize_threshold(p[1], table), p[2])
                   for p in self.planes]
         result = self.__class__(planes)
         result.isConjunction = self.isConjunction
         return result
 
-    def desymbolizeThreshold(self,threshold,table):
-        if isinstance(threshold,str):
+    def _desymbolize_threshold(self, threshold, table):
+        if isinstance(threshold, str):
             try:
-                return eval(threshold,globals(),table)
+                return eval(threshold, globals(), table)
             except NameError:
                 # Undefined reference: assume it'll get sorted out later
                 return threshold
-        elif isinstance(threshold,list):
-            return [self.desymbolizeThreshold(t,table) for t in threshold]
-        elif isinstance(threshold,set):
-            return {self.desymbolizeThreshold(t,table) for t in threshold}
-        elif isinstance(threshold,ActionSet):
+        elif isinstance(threshold, list):
+            return [self._desymbolize_threshold(t, table) for t in threshold]
+        elif isinstance(threshold, set):
+            return {self._desymbolize_threshold(t, table) for t in threshold}
+        elif isinstance(threshold, ActionSet):
             return table[threshold]
         else:
             return threshold
