@@ -155,7 +155,7 @@ class KeyedTree:
                 raise ValueError('Missing child for case %s in tree' % (subindex))
             return child[index]
 
-    def desymbolize(self,table,debug=False):
+    def desymbolize(self, table, debug=False):
         """
         @return: a new tree with any symbolic references replaced with numeric values according to the table of element lists
         @rtype: L{KeyedTree}
@@ -169,8 +169,7 @@ class KeyedTree:
                 tree.makeLeaf(leaf)
         elif self.branch:
             tree.makeBranch(self.branch.desymbolize(table),
-                            {value: self.children[value].desymbolize(table) \
-                             for value in self.children})
+                            {value: self.children[value].desymbolize(table) for value in self.children})
         else:
             new_branch = Distribution([(child.desymbolize(table), prob) for child, prob in self.children.items()])
             tree.makeProbabilistic(new_branch)
