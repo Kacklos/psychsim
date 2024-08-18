@@ -24,26 +24,24 @@ class KeyedVector(collections.abc.MutableMapping):
             self._data.update(arg)
 
     def prune(self):
-        for key,value in list(self.items()):
-            if abs(value) < self.epsilon:
-                del self[key]
+        self._data = {key: value for key, value in self._data.items() if abs(value) >= self.epsilon}
+        self._string = None
         return self
 
-    def __contains__(self,key):
+    def __contains__(self, key):
         return key in self._data
     
-    def __eq__(self,other):
-        delta = 0.
+    def __eq__(self, other):
+        delta = 0
         tested = {}
-        for key,value in self.items():
+        for key in self.keys() | other.keys():
+            my_value = self.get(key, 0)
+            yr_value = other.get(key, 0)
             try:
-                delta += abs(value-other[key])
-            except KeyError:
-                delta += abs(value)
-            tested[key] = True
-        for key,value in other.items():
-            if key not in tested:
-                delta += abs(value)
+                delta += abs(my_value-yr_value)
+            except TypeError:
+                if my_value != yr_value:
+                    return False
         return delta < self.epsilon
 
     def __ne__(self,other):
@@ -288,6 +286,7 @@ class KeyedVector(collections.abc.MutableMapping):
         yr_keys = set(other.keys())
         return sorted((my_keys-yr_keys)|(yr_keys-my_keys)|{k for k in my_keys&yr_keys if self[k] != other[k]})
 
+
 class VectorDistribution(Distribution):
     """
     A class representing a L{Distribution} over L{KeyedVector} instances
@@ -298,7 +297,7 @@ class VectorDistribution(Distribution):
 #            args = {KeyedVector({keys.CONSTANT:1}):1}
 #        Distribution.__init__(self,args)
 
-    def __contains__(self,key):
+    def __contains__(self, key):
         return key in self.first()
 
     def keys(self):
@@ -311,29 +310,30 @@ class VectorDistribution(Distribution):
         else:
             return set()
     
-    def join(self,key,value):
+    def join(self, key, value):
         """
         Modifies the distribution over vectors to have the given value for the given key
         :param key: the key to the column to modify
         :type key: str
         :param value: either a single value to apply to all vectors, or else a L{Distribution} over possible values
         """
-        original = dict(self)
-        domain = self.domain()
-        self.clear()
-        for row in domain:
-            prob = original[hash(row)]
-            if isinstance(value,Distribution):
-                for element in value.domain():
-                    new = row.__class__(row)
-                    new[key] = element
-                    self.addProb(new,prob*value[element])
-            else:
-                row[key] = value
-                self.addProb(row,prob)
+        if isinstance(value, Distribution) and len(value) > 1:
+            # Uncertain values to be joined
+            new_items = []
+            for my_el, my_prob in self.items():
+                for yr_el, yr_prob in value.items():
+                    new_row = my_el.__class__(my_el)
+                    new_row[key] = yr_el
+                    new_items.append((new_row, my_prob*yr_prob))
+            self._Distribution__items = new_items
+        else:
+            if isinstance(value, Distribution):
+                value = value.first()
+            for index, item in enumerate(self._Distribution__items):
+                item[0][key] = value
+                self._Distribution__items[index] = (item[0], item[1])
 
-
-    def merge(self,other,inPlace=False):
+    def merge(self, other, inPlace=False):
         """
         Merge two distributions (the passed-in distribution takes precedence over this one in case of conflict)
         :type other: VectorDistribution
@@ -344,36 +344,24 @@ class VectorDistribution(Distribution):
         """
         if inPlace:
             result = self
+            items = list(self.items())
+            result.clear()
         else:
-            result = {}
-        for old in self.domain():
-            prob = self[old]
-            del self[old]
-            for diff in other.domain():
-                new = old.__class__(old)
-                new.update(diff)
-                result.addProb(new, prob*other[diff])
-        if inPlace:
-            return self
-        else:
-            return self.__class__(result)
-        
-    def element2xml(self,value):
-        return value.__xml__().documentElement
+            result = self.__class__()
+            items = self.items()
+        for my_el, my_prob in items:
+            for yr_el, yr_prob in other.items():
+                new_el = my_el.__class__(my_el)
+                new_el.update(yr_el)
+                result.add_prob(new_el, my_prob*yr_prob)
+        return result
 
-    def xml2element(self,key,node):
-        return KeyedVector(node)
+    def marginal(self, key):
+        result = Distribution([(row[key], prob) for row, prob in self.items()])
+        result.remove_duplicates()
+        return result
 
-    def marginal(self,key):
-        result = {}
-        for row in self.domain():
-            try:
-                result[row[key]] += self[row]
-            except KeyError:
-                result[row[key]] = self[row]
-        return Distribution(result)
-
-    def select(self,maximize=False,incremental=False):
+    def select(self, maximize=False, incremental=False):
         """
         :param incremental: if C{True}, then select each key value in series (rather than picking out a joint vector all at once, default is C{False})
         """
@@ -401,97 +389,75 @@ class VectorDistribution(Distribution):
                 index += 1
             return sample
         else:
-            return Distribution.select(self,maximize)
-            
-    def deleteKey(self,key):
+            return super().select(maximize)
+           
+    def delete_column(self, key): 
         """
         Removes the specified column from all vectors in this distribution
         :type key: str
         """
-        vectors = [(vec,self[vec]) for vec in self.domain()]
-        self.clear()
-        for vec,prob in vectors:
-            del vec[key]
-            self.addProb(vec,prob)
-            
+        for index, item in enumerate(self._Distribution__items):
+            del item[0][key]
+        self.remove_duplicates()
+
+    def deleteKey(self, key):
+        """
+        Removes the specified column from all vectors in this distribution
+        :type key: str
+        """
+        raise DeprecationWarning('Use delete_column instead')
+
     def hasColumn(self,key):
         """
         :return: C{True} iff the given key appears in all of the vectors of this distribution
         :rtype: bool
         """
-        for vector in self.domain():
-            if not key in vector:
-                return False
-        return True
+        raise DeprecationWarning('This needs to be re-implemented. Notify the authorities."')
 
-    def __rmul__(self,other):
-        if isinstance(other,KeyedVector):
-            result = {}
-            for vector in self.domain():
-                product = other*vector
-                try:
-                    result[product] += self[vector]
-                except KeyError:
-                    result[product] = self[vector]
-            return Distribution(result)
+    def __rmul__(self, other):
+        if isinstance(other, KeyedVector):
+            result = self.__class__([(other*vector, prob) for vector, prob in self.items()])
+            result.remove_duplicates()
+            return result
         else:
             raise NotImplementedError
 
-    def __imul__(self,other):
-        original = [(vector, self[vector]) for vector in self.domain()]
-        self.clear()
-        for vector,prob in original:
+    def __imul__(self, other):
+        for vector, prob in self.items():
             vector *= other
-            if isinstance(vector,VectorDistribution):
-                for vec in vector.domain():
-                    self.addProb(vec,vector[vec]*prob)
-            else:
-                self.addProb(vector,prob)
-        assert abs(sum([self[el] for el in self.domain()]) - 1)<1e-8,[self[el] for el in self.domain()]
+        self.remove_duplicates()
         return self
 
-    def prune(self,probThreshold,true=None):
-        change = False
-        for vec in self.domain():
-            if self[vec] < probThreshold:
-                if true:
-                    for key in true:
-                        if vec[key] != true[key]:
-                            break
-                    else:
-                        # Has the true state, so don't delete
-                        continue
-                change = True
-                del self[vec]
-        if change:
-            self.normalize()
+    def prune_probability(self, probThreshold, true=None):
+        if true is None:
+            return super().prune_probability(probThreshold)
+        else:
+            raise NotImplementedError('Unable to preserve true state')
+#        for vec in self.domain():
+#            if self[vec] < probThreshold:
+#                if true:
+#                    for key in true:
+#                        if vec[key] != true[key]:
+#                            break
+#                    else:
+#                        # Has the true state, so don't delete
+#                        continue
                 
-    def __deepcopy__(self,memo):
-        result = self.__class__({})
-        for vector in self.domain():
-            new = KeyedVector(vector)
-            result[new] = self[vector]
-        return result
+    def __deepcopy__(self, memo):
+        return self.__class__([(vector.__class__(vector), prob) for vector, prob in self.items()])
 
     def copy_value(self, old_key, new_key):
         """
         Modifies the state so that the distribution over the new key's values is identical to that of the old key
         """
-        original = dict(self)
-        domain = self.domain()
-        self.clear()
-        for row in domain:
-            assert isinstance(row, KeyedVector)
-            prob = original[hash(row)]
-            row[new_key] = row[old_key]
-            self[row] = prob
+        for index, item in enumerate(self._Distribution__items):
+            item[0][new_key] = item[0][old_key]
+        self.remove_duplicates()
 
-    def rollback(self,future=None):
-        original = [(vector, self[vector]) for vector in self.domain()]
-        self.clear()
-        for vector,prob in original:
-            vector.rollback(future)
-            self.addProb(vector,prob)
+    def rollback(self, future=None):
+        for index, item in enumerate(self._Distribution__items):
+            item[0].rollback(future)
+        self.remove_duplicates()
         return self
 
     def replace(self, substitution, key=None):
@@ -512,8 +478,8 @@ class VectorDistribution(Distribution):
                     vector[key] = substitution[vector[key]]
                     self[vector] = prob
 
-    def domain(self,key=None):
-        if isinstance(key,str):
+    def domain(self, key=None):
+        if isinstance(key, str):
             return {v[key] for v in self.domain()}
         elif key is None:
             return super().domain()
@@ -532,6 +498,5 @@ class VectorDistribution(Distribution):
             for vector in vectors}))
         return uncertain_str if suppress_certain else '{}\n{}'.format(certain_str, uncertain_str)
         
-    def __str__(self):
-        return '\n'.join(['%d%%\n%s' % (prob*100,vector.sortedString()) 
-            for vector,prob in sorted(self.items(),key=lambda i: i[1],reverse=True)])
+    def element_to_str(self, element):
+        return element.sortedString()

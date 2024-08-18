@@ -1,6 +1,3 @@
-import math
-import os
-
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -16,10 +13,10 @@ try:
 except:
     __graph__ = False
 
-import csv
 
 gtnodes = {}
-#with open('/home/david/Downloads/Annotated Graph USC v2.0 - graph.tsv','r') as csvfile:
+# import csv
+# with open('/home/david/Downloads/Annotated Graph USC v2.0 - graph.tsv','r') as csvfile:
 #    reader = csv.DictReader(csvfile,delimiter='\t')
 #    for row in reader:
 #        if row['Source'] not in gtnodes:
@@ -29,18 +26,19 @@ gtnodes = {}
 #        gtnodes[row['Source']].add(row['Target'])
 #print(sorted(gtnodes.keys()))
 
+
 def getLayout(graph):
     layout = {'state pre': [set()],
               'state post': [set()],
               'action': set(),
               'utility': set(),
               }
-    for target in ['state pre','state post']:
+    for target in ['state pre', 'state post']:
         remaining = []
-        for key,table in graph.items():
+        for key, table in graph.items():
             if table['type'] == target:
-                parents = set([parent for parent in table['parents'] \
-                                   if graph[parent]['type'] == target])
+                parents = set([parent for parent in table['parents'] 
+                               if graph[parent]['type'] == target])
                 if len(parents) == 0:
                     table['index'] = 0
                     layout[target][0].add(key)
@@ -49,26 +47,27 @@ def getLayout(graph):
         while len(remaining) > 0:
             layout[target].append(set())
             temp = []
-            for key,parents in remaining:
+            for key, parents in remaining:
                 parents -= layout[target][-2]
                 if parents:
-                    temp.append((key,parents))
+                    temp.append((key, parents))
                 else:
                     layout[target][-1].add(key)
             remaining = temp
-    for target in ['action','utility']:
-        for key,table in graph.items():
+    for target in ['action', 'utility']:
+        for key, table in graph.items():
             if table['type'] == target:
                 layout[target].add(key)
 
     return layout
     
+
 class WorldView(QGraphicsScene):
     rowHeight = 100
     colWidth = 150
     
-    def __init__(self,parent = None):
-        super(WorldView,self).__init__(parent)
+    def __init__(self, parent=None):
+        super(WorldView, self).__init__(parent)
         self.setBackgroundBrush(QColor('white'))
         self.nodes = {'state pre': {},
                       'state post': {},
@@ -86,14 +85,14 @@ class WorldView(QGraphicsScene):
         self.xml = None
 
     def clear(self):
-        super(WorldView,self).clear()
+        super(WorldView, self).clear()
         for table in self.nodes.values():
             table.clear()
         self.edgesOut.clear()
         self.edgesIn.clear()
         self.center = None
         
-    def displayWorld(self,agents=None):
+    def displayWorld(self, agents=None):
         self.clear()
 
         self.graph = graph.DependencyGraph(self.world)
@@ -109,15 +108,23 @@ class WorldView(QGraphicsScene):
         # Lay out the post variable nodes
         x = self.drawStateNodes(layout['state post'],self.graph,x,0,'xpost','ypost')
         # Lay out the utility nodes
-        x = self.drawUtilityNodes(x,0,self.graph,sorted(self.world.agents.keys()))
+        u_agents = [a.name for a in self.world.agents.values() 
+                    if len(a.actions) > 1]
+        x = self.drawUtilityNodes(x, 0, self.graph, sorted(u_agents))
         self.colorNodes()
         # Lay out edges
-        for key,entry in self.graph.items():
+        for key, entry in self.graph.items():
+            self_edge = not isinstance(key, str) or isFuture(key) or key in self.world.agents
             if key in self.nodes[entry['type']]:
                 node = self.nodes[entry['type']][key]
                 for child in entry['children']:
                     if child in self.nodes[self.graph[child]['type']]:
                         self.drawEdge(key,child)
+                        if not self_edge and child == makeFuture(key):
+                            self_edge = True
+            if not self_edge:
+                if key not in self.world.dynamics or True not in self.world.dynamics[key]:
+                    self.drawEdge(key, makeFuture(key))
 
     def displayGroundTruth(self,agent=WORLD,x0=0,y0=0,maxRows=10,recursive=False,selfCycle=False):
         if agent == WORLD:
@@ -559,20 +566,20 @@ class WorldView(QGraphicsScene):
     def updateEdges(self,key,rect):
         self.setDirty()
         if key in self.edgesOut:
-            for subkey,(edge,arrow) in self.edgesOut[key].items():
+            for subkey, (edge, arrow) in list(self.edgesOut[key].items()):
                 if self.center is None or key in self.center or subkey in self.center:
-                    if isinstance(edge,QGraphicsLineItem):
+                    if isinstance(edge, QGraphicsLineItem):
                         line = edge.line()
                         line.setP1(QPointF(rect.x()+rect.width(),rect.y()+rect.height()/2))
                         edge.setLine(line)
-                        drawArrow(line,arrow=arrow)
+                        drawArrow(line, arrow=arrow)
                     elif key != subkey:
                         edge.scene().removeItem(edge)
                         del self.edgesOut[key][subkey]
                         del self.edgesIn[subkey][key]
-                        self.drawEdge(key,subkey,rect0=rect)
+                        self.drawEdge(key, subkey, rect0=rect)
         if key in self.edgesIn:
-            for subkey,(edge,arrow) in self.edgesIn[key].items():
+            for subkey,(edge,arrow) in list(self.edgesIn[key].items()):
                 if self.center is None or key in self.center or subkey in self.center:
                     if isinstance(edge,QGraphicsLineItem):
                         line = edge.line()
@@ -597,9 +604,24 @@ class WorldView(QGraphicsScene):
                 color = node.defaultColor
                 if mode == 'agent':
                     if node.agent:
-                        color = self.world.diagram.getColor(node.agent.name)
+                        if node.agent.color:
+                            obj_color = None
+                            if isinstance(node, ActionNode):
+                                if node.action['object']:
+                                    obj_color = node.agent.world.agents[node.action['object']].color
+                            if obj_color:
+                                pass
+                            if isinstance(node.agent.color, str):
+                                color = QColor(node.agent.color)
+                            else:
+                                color = node.agent.color
+                        else:
+                            color = self.world.diagram.getColor(node.agent.name)
                     elif node.agent is None:
-                        color = self.world.diagram.getColor(None)
+                        if self.world.color is None:
+                            color = self.world.diagram.getColor(None)
+                        else:
+                            color = QColor(self.world.color)
                 elif mode == 'likelihood':
                     if cache is None:
                         # Pre-compute some outcomes
@@ -673,7 +695,7 @@ class WorldView(QGraphicsScene):
 
     def saveImage(self,fname):
         rect = self.minRect() #self.sceneRect()
-        pix = QImage(rect.width(), rect.height(),QImage.Format_ARGB32)
+        pix = QImage(int(rect.width()), int(rect.height()), QImage.Format_ARGB32)
         painter = QPainter(pix)
         self.render(painter,rect)
         painter.end()
@@ -722,6 +744,7 @@ def initializeNode(node,label):
     # Vertical centering of label
     node.text.setPos(rect.x(),rect.y()+(rect.height()-myRect.height())/2.)
 
+
 class VariableNode(QGraphicsEllipseItem):
     defaultWidth = 100
     defaultHeight = 50
@@ -769,12 +792,14 @@ class VariableNode(QGraphicsEllipseItem):
                 self.scene().world.variables[key]['ypre'] = int(rect.y())
         return QGraphicsEllipseItem.itemChange(self,change,value)
 
+
 class ActionNode(QGraphicsRectItem):
     defaultWidth = 100
     defaultHeight = 50
     defaultColor = 'wheat'
 
     def __init__(self,agent,action,x=None,y=None,w=None,h=None,scene=None):
+        print(agent.world.diagram)
         if x is None:
             x = agent.world.diagram.getX(action)
         if y is None:
@@ -799,7 +824,8 @@ class ActionNode(QGraphicsRectItem):
             self.scene().updateEdges(self.action,rect)
             self.action.x = int(rect.x())
             self.action.y = int(rect.y())
-        return QGraphicsEllipseItem.itemChange(self,change,value)
+        return QGraphicsRectItem.itemChange(self,change,value)
+
 
 class UtilityNode(QGraphicsPolygonItem):
     defaultColor = 'wheat'
@@ -819,7 +845,7 @@ class UtilityNode(QGraphicsPolygonItem):
     def itemChange(self,change,value):
         if change == QGraphicsItem.ItemPositionHasChanged:
             self.scene().updateEdges(self.agent.name,self.sceneBoundingRect())
-        return QGraphicsEllipseItem.itemChange(self,change,value)
+        return QGraphicsPolygonItem.itemChange(self,change,value)
 
 def dist2color(distribution):
     """

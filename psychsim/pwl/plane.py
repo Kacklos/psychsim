@@ -1,10 +1,10 @@
-import operator
-from xml.dom.minidom import Node,Document
+from xml.dom.minidom import Node, Document
 
 from psychsim.pwl.keys import CONSTANT
 from psychsim.pwl.vector import KeyedVector
 from psychsim.probability import Distribution
 from psychsim.action import ActionSet
+
 
 class KeyedPlane:
     """
@@ -18,14 +18,14 @@ class KeyedPlane:
     """
     DEFAULT_THRESHOLD = 0.
     DEFAULT_COMPARISON = 1
-    COMPARISON_MAP = ['==','>','<']
+    COMPARISON_MAP = ['==', '>', '<']
 
     def __init__(self,planes,threshold=None,comparison=None):
         """
         :warning: if S{planes} is a list, then S{threshold} and S{comparison} are ignored
         """
         if isinstance(planes,Node):
-            self.parse(planes)
+            raise DeprecationWarning('XML format no longer supported')
         elif isinstance(planes,KeyedVector):
             # Only a single branch passed
             if threshold is None:
@@ -207,25 +207,25 @@ class KeyedPlane:
             else:
                 return False
 
-    def desymbolize(self,table,debug=False):
-        planes = [(p[0].desymbolize(table), self.desymbolizeThreshold(p[1],table),p[2])
+    def desymbolize(self, table, debug=False):
+        planes = [(p[0].desymbolize(table), self._desymbolize_threshold(p[1], table), p[2])
                   for p in self.planes]
         result = self.__class__(planes)
         result.isConjunction = self.isConjunction
         return result
 
-    def desymbolizeThreshold(self,threshold,table):
-        if isinstance(threshold,str):
+    def _desymbolize_threshold(self, threshold, table):
+        if isinstance(threshold, str):
             try:
-                return eval(threshold,globals(),table)
+                return eval(threshold, globals(), table)
             except NameError:
                 # Undefined reference: assume it'll get sorted out later
                 return threshold
-        elif isinstance(threshold,list):
-            return [self.desymbolizeThreshold(t,table) for t in threshold]
-        elif isinstance(threshold,set):
-            return {self.desymbolizeThreshold(t,table) for t in threshold}
-        elif isinstance(threshold,ActionSet):
+        elif isinstance(threshold, list):
+            return [self._desymbolize_threshold(t, table) for t in threshold]
+        elif isinstance(threshold, set):
+            return {self._desymbolize_threshold(t, table) for t in threshold}
+        elif isinstance(threshold, ActionSet):
             return table[threshold]
         else:
             return threshold
@@ -437,60 +437,103 @@ class KeyedPlane:
                 self.planes.append((vector,threshold,comparison))
             node = node.nextSibling
 
-def thresholdRow(key,threshold):
+
+def thresholdRow(key, threshold):
     """
     :return: a plane testing whether the given keyed value exceeds the given threshold
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key: 1}),threshold)
-def differenceRow(key1,key2,threshold):
+    return KeyedPlane(KeyedVector({key: 1}), threshold)
+
+
+def differenceRow(key1, key2, threshold):
     """
     :return: a plane testing whether the difference between the first and second keyed values exceeds the given threshold
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key1: 1,key2: -1}),threshold)
-def greaterThanRow(key1,key2):
+    return KeyedPlane(KeyedVector({key1: 1, key2: -1}), threshold)
+
+
+def greaterThanRow(key1, key2):
     """
     :return: a plane testing whether the first keyed value is greater than the second
     :rtype: L{KeyedPlane}
     """
-    return differenceRow(key1,key2,0)
+    return differenceRow(key1, key2, 0)
+
+
 def trueRow(key):
     """
     :return: a plane testing whether a boolean keyed value is True
     :rtype: L{KeyedPlane}
     """
-    return thresholdRow(key,0.5)
+    return thresholdRow(key, 0.5)
+
+
 def falseRow(key):
     """
     :return: a plane testing whether a boolean keyed value is False
     :rtype: L{KeyedPlane}
     """
     return KeyedPlane(KeyedVector({key: 1}), 0.5, -1)
-def andRow(trueKeys=[],falseKeys=[]):
+
+
+def andRow(trueKeys=[], falseKeys=[]):
+    return and_row(trueKeys, falseKeys)
+
+
+def and_row(true_keys=[], false_keys=[]):
     """
-    :param trueKeys: list of keys which must be C{True} (default is empty list)
-    :type trueKeys: str[]
-    :param falseKeys: list of keys which must be C{False} (default is empty list)
-    :type falseKeys: str[]
+    :param true_keys: list of keys which must be C{True} (default is empty list)
+    :type true_keys: str[]
+    :param false_keys: list of keys which must be C{False} (default is empty list)
+    :type false_keys: str[]
     :return: a plane testing whether all boolean keyed values are set as desired
     :rtype: L{KeyedPlane}
     """
     weights = {}
-    for key in trueKeys:
+    for key in true_keys:
         weights[key] = 1
-    for key in falseKeys:
+    for key in false_keys:
         weights[key] = -1
-    return KeyedPlane(KeyedVector(weights),len(trueKeys)-0.5)
-def equalRow(key,value):
+    return KeyedPlane(KeyedVector(weights), len(true_keys)-0.5)
+
+
+def or_row(true_keys=[], false_keys=[]):
     """
-    :return: a plane testing whether the given keyed value equals the given target value
+    :param true_keys: list of keys that will make the result C{True} if any are {True} (default is empty list)
+    :type true_keys: str[]
+    :param false_keys: list of keys that will make the result C{True} if any are {False} (default is empty list)
+    :type false_keys: str[]
+    :return: a plane testing whether any boolean keyed values are set as desired
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key: 1}),value,0)
-def equalFeatureRow(key1,key2):
+    weights = {CONSTANT: 0}
+    for key in true_keys:
+        weights[key] = 1
+    for key in false_keys:
+        weights[key] = -1
+        weights[CONSTANT] += 1
+    return KeyedPlane(KeyedVector(weights), 0.5)
+
+
+def equalRow(key, value):
+    """
+    :type key: str or str[] or str->float/int
+    :return: a plane testing whether the given keyed value (or sum of keyed values) equals the given target value
+    :rtype: L{KeyedPlane}
+    """
+    if isinstance(key, list):
+        return KeyedPlane(KeyedVector({k: 1 for k in key}), value, 0)
+    elif isinstance(key, dict):
+        return KeyedPlane(KeyedVector(key), value, 0)
+    else:
+        return KeyedPlane(KeyedVector({key: 1}), value, 0)
+
+
+def equalFeatureRow(key1, key2):
     """
     :return: a plane testing whether the values of the two given features are equal
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key1: 1,key2: -1}),0,0)
+    return KeyedPlane(KeyedVector({key1: 1, key2: -1}), 0, 0)

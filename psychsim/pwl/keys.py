@@ -181,3 +181,27 @@ def escapeKey(key):
     else:
         name = key
     return name.replace(' ','')
+
+
+def var_agent_match(key, name):
+    """
+    :return: True iff any agent reference in key matches name (if str) or is in name (if set)
+    """
+    if isStateKey(key):
+        if isinstance(name, set):
+            return state2agent(key) in name
+        else:
+            return state2agent(key) == name
+    elif isBinaryKey(key):
+        fields = key2relation(key)
+        if isinstance(name, set):
+            return fields['subject'] in name or fields['object'] in name
+        else:
+            return fields['subject'] == name or fields['object'] == name
+    elif isBeliefKey(key):
+        if isinstance(name, set):
+            return belief2believer(key) in name or var_agent_match(belief2key(key), name)
+        else:
+            return belief2believer(key) == name or var_agent_match(belief2key(key), name)
+    else:
+        raise TypeError(f'Unable to determine type of variable {key}')

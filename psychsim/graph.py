@@ -4,6 +4,7 @@ Class definition for representation of dependency structure among all variables 
 from psychsim.pwl.keys import *
 from psychsim.action import ActionSet
 
+
 class DependencyGraph(dict):
     """
     Representation of dependency structure among PsychSim variables
@@ -42,7 +43,7 @@ class DependencyGraph(dict):
             self.computeGraph()
         return dict.__getitem__(self,key)
 
-    def computeGraph(self,agents=None,state=None,belief=False):
+    def computeGraph(self, agents=None,state=None,belief=False):
         # Process the unary state features
         if agents is None:
             agents = sorted(self.world.agents.keys())
@@ -60,8 +61,8 @@ class DependencyGraph(dict):
                         self[makeFuture(key)] = {'agent': agent,'type': 'state post',
                                                  'children': set(),'parents': set()}
         # Process the binary state features
-        for relation,table in self.world.relations.items():
-            for key,entry in table.items():
+        for relation, table in self.world.relations.items():
+            for key, entry in table.items():
                 if key in state and entry['subject'] in agents and entry['object'] in agents:
                     self[key] = {'agent': entry['subject'],
                                  'type': 'state pre',
@@ -85,14 +86,14 @@ class DependencyGraph(dict):
                 # Process the agent actions
                 for action in agent.actions:
                     action = ActionSet([a.root() for a in action])
-                    if not action in self:
+                    if action not in self:
                         self[action] = {'agent': name,
                                         'type': 'action',
                                         'parents': set(),
                                         'children': set()}
         # Create links from dynamics
-        for key,dynamics in self.world.dynamics.items():
-            if not isinstance(key,str):
+        for key, dynamics in self.world.dynamics.items():
+            if not isinstance(key, str):
                 continue
             if isTurnKey(key):
                 continue
@@ -101,12 +102,12 @@ class DependencyGraph(dict):
             if isBinaryKey(key) and not key2relation(key)['subject'] in agents and \
                not key2relation(key)['object'] in agents:
                 continue
-            if not key in self:
+            if key not in self:
                 continue
 #            assert self.has_key(key),'Graph has not accounted for key: %s' % (key)
-            if isinstance(dynamics,bool):
+            if isinstance(dynamics, bool):
                 continue
-            for action,tree in dynamics.items():
+            for action, tree in dynamics.items():
                 if not action is True and action['subject'] in agents:
                     # Link between action to this feature
                     if action in self:
@@ -115,8 +116,7 @@ class DependencyGraph(dict):
                         dict.__getitem__(self,action)['children'].add(makeFuture(key))
                 # Link between dynamics variables and this feature
                 for parent in tree.getKeysIn() - set([CONSTANT]):
-                    if (state2agent(parent) == WORLD or state2agent(parent) in agents) and \
-                       parent in self:
+                    if (state2agent(parent) == WORLD or state2agent(parent) in agents) and parent in self:
                         dict.__getitem__(self,makeFuture(key))['parents'].add(parent)
                         dict.__getitem__(self,parent)['children'].add(makeFuture(key))
         for name in agents:
@@ -164,7 +164,7 @@ class DependencyGraph(dict):
         """
         self.root = set()
         self.layers = []
-        for key,node in self.items():
+        for key, node in self.items():
             node['ancestors'] = set(node['parents'])
             if len(node['parents']) == 0:
                 # Root node
@@ -172,16 +172,16 @@ class DependencyGraph(dict):
                 node['level'] = 0
         self.layers = [self.root]
         level = 0
-        while sum(map(len,self.layers)) < len(self):
+        while sum(map(len, self.layers)) < len(self):
             layer = set()
             for key in self.layers[level]:
                 for child in self[key]['children']:
                     # Update ancestors
                     self[child]['ancestors'] |= self[key]['ancestors']
-                    if not child in layer:
+                    if child not in layer:
                         # Check whether eligible for the new layer
                         for parent in self[child]['parents']:
-                            if not 'level' in self[parent] or self[parent]['level'] > level:
+                            if 'level' not in self[parent] or self[parent]['level'] > level:
                                 # Ineligible to be in this layer
                                 break
                         else:
@@ -203,14 +203,14 @@ class DependencyGraph(dict):
         #         self.evaluation.append(set())
         #     self.evaluation[self[key]['level']].add(makePresent(key))
             
-        for agent,variables in self.world.locals.items():
+        for agent, variables in self.world.locals.items():
             for feature in variables.keys():
-                key = stateKey(agent,feature,True)
+                key = stateKey(agent, feature, True)
                 while len(self.evaluation) <= self[key]['level']:
                     self.evaluation.append(set())
                 self.evaluation[self[key]['level']].add(makePresent(key))
-        for relation,variables in self.world.relations.items():
-            for key,table in variables.items():
+        for relation, variables in self.world.relations.items():
+            for key, table in variables.items():
                 while len(self.evaluation) <= self[key]['level']:
                     self.evaluation.append(set())
                 self.evaluation[self[key]['level']].add(makePresent(key))
